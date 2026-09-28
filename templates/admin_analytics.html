@@ -14,6 +14,7 @@
         <nav aria-label="Admin navigation">
             <a href="{{ url_for('admin_dashboard') }}">Issue dashboard</a>
             <a href="{{ url_for('admin_analytics') }}" aria-current="page">Analytics</a>
+            <a href="{{ url_for('admin_issue_map') }}">Issue map</a>
             <form action="{{ url_for('logout') }}" method="post">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit">Sign out</button>

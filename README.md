@@ -72,10 +72,12 @@ Sign-in and registration are available at `/login` and `/register`. Signing out 
 | `/issues/<id>`             | View issue details and status history             | Owner student or admin                          |
 | `/admin`                   | Admin dashboard                                   | Admin                                           |
 | `/admin/analytics`         | Campus issue analytics and date-filtered charts   | Admin                                           |
+| `/admin/map`               | Campus location map and report list               | Admin                                           |
 | `/api/my-reports`          | List the current user's reports                   | Student or admin                                |
 | `/api/reports`             | Search/filter reports                             | Student or admin                                |
 | `/api/admin/issues`        | Filtered, paginated issue list and summary counts | Admin                                           |
 | `/api/admin/analytics`     | Date-filtered metrics, charts, and unresolved hotspots | Admin                                      |
+| `/api/admin/map`           | Filtered campus location counts and report summaries | Admin                                       |
 | `/api/issues/<id>`         | Get issue details; admins can update with PATCH   | Owner student or admin for GET; admin for PATCH |
 | `/api/issues/<id>/history` | Get issue status and assignment history           | Owner student or admin                          |
 
@@ -83,9 +85,15 @@ Admin issue filters include `q`, `status`, `category`, `location`, and `priority
 
 The admin analytics page reports total and unresolved issues, resolution rate, average resolution time, issue counts by category and location, monthly submission trends, and locations with the most unresolved reports. An optional start and end date filters reports by their submission date. Resolution time uses the issue creation timestamp and the first resolved or closed status timestamp recorded in issue history. Charts use Chart.js loaded from jsDelivr.
 
+The admin issue map uses Leaflet and OpenStreetMap tiles. It is centered on the provided approximate campus coordinate (26.7759, 75.8745). Configure verified per-location coordinates in the `CAMPUS_LOCATION_COORDINATES` environment variable as a JSON object whose keys are `Building Name|Area Name` and whose values are `[latitude, longitude]`. Configure the actual coordinates for each location already listed in the `locations` table; until then, its report list remains available but it has no individual map marker. The map does not use browser geolocation or expose reporter identity or personal location data. OpenStreetMap tile use requires visible attribution and must follow the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
+
 ## Issue Photos
 
 The report form accepts JPEG, PNG, and WebP images up to 5 MB. The server checks both the file extension and image signature, assigns a generated filename, and stores uploads under `static/uploads/`. Original client filenames are not used as disk paths.
+
+## Duplicate Report Warning
+
+When a student submits a report, the app checks unresolved reports from the previous seven days at the same location and in the same category. It lowercases titles, removes punctuation, and compares them with Python's `difflib.SequenceMatcher`; a similarity score of 0.78 or higher displays the closest match for review. Students can cancel or submit their report anyway. The warning never merges or deletes reports. This title-only heuristic can miss differently worded reports about the same problem and can flag similar titles about separate problems. If the warning is shown, an attached photo must be selected again before choosing to submit anyway.
 
 ## Project Structure
 
@@ -104,10 +112,11 @@ FixMyCampus/
 |   |-- my_reports.html        Student report portal
 |   |-- issue_details.html     Issue details and history
 |   |-- admin_dashboard.html   Admin dashboard
-|   `-- admin_analytics.html   Admin issue analytics
+|   |-- admin_analytics.html  Admin issue analytics
+|   `-- admin_map.html        Admin campus map and accessible report list
 `-- static/
 |-- css/                   Page stylesheets
-|-- js/                    Vanilla JavaScript and Chart.js dashboard interactions
+|-- js/                    Vanilla JavaScript, Chart.js, and Leaflet interactions
 `-- uploads/               Uploaded issue photos
 ```
 

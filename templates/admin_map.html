@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#231e13">
+    <title>Campus Issue Map | Fix My Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_map.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+</head>
+<body class="map-page-body">
+    <header class="map-page-header">
+        <a class="map-brand" href="{{ url_for('admin_dashboard') }}"><span>F</span><strong>Fix My Campus</strong></a>
+        <nav aria-label="Admin navigation">
+            <a href="{{ url_for('admin_dashboard') }}">Issue dashboard</a>
+            <a href="{{ url_for('admin_analytics') }}">Analytics</a>
+            <a href="{{ url_for('admin_issue_map') }}" aria-current="page">Issue map</a>
+            <form action="{{ url_for('logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit">Sign out</button>
+            </form>
+        </nav>
+    </header>
+
+    <main class="campus-map-main" data-api-url="{{ url_for('admin_issue_map_api') }}" data-issue-url="{{ url_for('issue_detail', issue_id=0) }}" data-center-lat="{{ map_center[0] }}" data-center-lng="{{ map_center[1] }}">
+        <div class="map-title-row">
+            <div>
+                <p class="map-eyebrow">Campus operations</p>
+                <h1>Campus issue map</h1>
+                <p>Explore reports by campus location. Pins show the number of unresolved reports.</p>
+            </div>
+            <a href="{{ url_for('admin_dashboard') }}">← Issue dashboard</a>
+        </div>
+
+        <form class="map-filters" id="map-filters">
+            <div><label for="map-category">Category</label>
+                <select id="map-category" name="category">
+                    <option value="">All categories</option>
+                    {% for category in categories %}<option value="{{ category }}">{{ category }}</option>{% endfor %}
+                </select>
+            </div>
+            <div><label for="map-status">Status</label>
+                <select id="map-status" name="status">
+                    <option value="all">All statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In progress</option>
+                    <option value="resolved">Resolved</option>
+                </select>
+            </div>
+            <button type="button" id="map-filter-reset">Clear filters</button>
+            <p class="map-filter-help">Category filters marker counts. Status filters the reports shown in popups and the list.</p>
+        </form>
+
+        <p class="map-state" id="map-loading" role="status">Loading campus locations…</p>
+        <p class="map-state map-error" id="map-error" role="alert" hidden></p>
+
+        <section class="map-section" aria-labelledby="map-heading">
+            <div class="section-title"><div><h2 id="map-heading">Location map</h2><p>Open a marker to see matching reports and their status.</p></div>
+                <div class="map-legend" aria-label="Unresolved report marker colors">
+                    <span><i class="pin-key pin-low"></i>0</span><span><i class="pin-key pin-mid"></i>1–2</span><span><i class="pin-key pin-high"></i>3–5</span><span><i class="pin-key pin-critical"></i>6+</span>
+                </div>
+            </div>
+            <p class="map-no-coordinates" id="map-no-coordinates" hidden>No campus coordinates are configured yet. Locations and reports remain available in the list below.</p>
+            <div id="campus-map" role="region" aria-label="Map of predefined campus locations"></div>
+            <p class="map-attribution-note">Map tiles © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</p>
+        </section>
+
+        <section class="location-directory" aria-labelledby="directory-heading">
+            <div class="section-title"><div><h2 id="directory-heading">Location and report list</h2><p>This list provides the same information without using the map.</p></div></div>
+            <p class="directory-empty" id="directory-empty" hidden>No campus locations are configured.</p>
+            <div class="directory-grid" id="directory-grid"></div>
+        </section>
+    </main>
+
+    <footer class="map-page-footer">Fix My Campus <span>·</span> Campus care, coordinated</footer>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="{{ url_for('static', filename='js/admin_map.js') }}" defer></script>
+</body>
+</html>

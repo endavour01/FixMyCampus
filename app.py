@@ -1,4 +1,6 @@
 import click
+import difflib
+import json
 import os
 import re
 import secrets
@@ -67,6 +69,7 @@ app.config.update(
     SESSION_COOKIE_SECURE=os.environ.get("FLASK_COOKIE_SECURE", "").lower() in {"1", "true", "yes"},
     PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
     COLLEGE_EMAIL_DOMAIN=os.environ.get("COLLEGE_EMAIL_DOMAIN", "").strip().lower().lstrip("@"),
+    CAMPUS_LOCATION_COORDINATES=os.environ.get("CAMPUS_LOCATION_COORDINATES", "{}"),
 )
 csrf = CSRFProtect(app)
 DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(32))
@@ -480,6 +483,118 @@ def admin_analytics_api():
             "hotspots": [dict(row) for row in hotspots],
         },
         "meta": {"start_date": start_date or None, "end_date": end_date or None},
+    })
+
+
+@app.route("/admin/map")
+@login_required
+@roles_required("admin")
+def admin_issue_map():
+    return render_template(
+        "admin_map.html",
+        categories=ISSUE_CATEGORIES,
+        map_center=(26.7759, 75.8745),
+    )
+
+
+@app.route("/api/admin/map")
+@login_required
+@roles_required("admin")
+def admin_issue_map_api():
+    """Return campus location aggregates and reports without reporter identity data."""
+    category = request.args.get("category", "").strip()
+    status = request.args.get("status", "all").strip()
+    if category and category not in ISSUE_CATEGORIES:
+        return api_error("invalid_category", "Choose a valid issue category.", 400)
+    status_groups = {
+        "all": (),
+        "pending": ("submitted", "under_review"),
+        "in_progress": ("in_progress",),
+        "resolved": ("resolved", "closed"),
+    }
+    if status not in status_groups:
+        return api_error("invalid_status", "Choose a valid status filter.", 400)
+
+    try:
+        configured_coordinates = json.loads(app.config["CAMPUS_LOCATION_COORDINATES"] or "{}")
+    except (TypeError, json.JSONDecodeError):
+        configured_coordinates = {}
+    if not isinstance(configured_coordinates, dict):
+        configured_coordinates = {}
+
+    locations = query_db(
+        "SELECT location_id, building_name, area_name, floor_number FROM locations ORDER BY building_name, floor_number, area_name"
+    )
+    category_condition = " AND issues.category = ?" if category else ""
+    category_parameters = [category] if category else []
+    unresolved_rows = query_db(
+        f"""SELECT location_id, COUNT(*) AS count FROM issues
+            WHERE status NOT IN ('resolved', 'closed'){category_condition}
+            GROUP BY location_id""",
+        category_parameters,
+    )
+    unresolved_counts = {row["location_id"]: row["count"] for row in unresolved_rows}
+
+    report_conditions = []
+    report_parameters = []
+    if category:
+        report_conditions.append("category = ?")
+        report_parameters.append(category)
+    selected_statuses = status_groups[status]
+    if selected_statuses:
+        placeholders = ", ".join("?" for _ in selected_statuses)
+        report_conditions.append(f"status IN ({placeholders})")
+        report_parameters.extend(selected_statuses)
+    report_where = f"WHERE {' AND '.join(report_conditions)}" if report_conditions else ""
+    reports = query_db(
+        f"""SELECT issue_id, location_id, title, category, status, created_at
+            FROM issues {report_where}
+            ORDER BY created_at DESC, issue_id DESC""",
+        report_parameters,
+    )
+    reports_by_location = {}
+    for issue in reports:
+        reports_by_location.setdefault(issue["location_id"], []).append({
+            "issue_id": issue["issue_id"],
+            "title": issue["title"],
+            "category": issue["category"],
+            "status": issue["status"],
+            "created_at": issue["created_at"],
+        })
+
+    data = []
+    for location in locations:
+        coordinate_key = f"{location['building_name']}|{location['area_name']}"
+        coordinate = configured_coordinates.get(coordinate_key)
+        latitude = longitude = None
+        if (isinstance(coordinate, (list, tuple)) and len(coordinate) == 2
+                and not any(isinstance(value, bool) for value in coordinate)):
+            try:
+                latitude, longitude = float(coordinate[0]), float(coordinate[1])
+            except (TypeError, ValueError):
+                latitude = longitude = None
+            if (latitude is not None and longitude is not None
+                    and (-90 <= latitude <= 90) and (-180 <= longitude <= 180)):
+                pass
+            else:
+                latitude = longitude = None
+
+        location_reports = reports_by_location.get(location["location_id"], [])
+        data.append({
+            "location_id": location["location_id"],
+            "building_name": location["building_name"],
+            "area_name": location["area_name"],
+            "floor_number": location["floor_number"],
+            "latitude": latitude,
+            "longitude": longitude,
+            "unresolved_count": unresolved_counts.get(location["location_id"], 0),
+            "report_count": len(location_reports),
+            "reports": location_reports[:25],
+        })
+
+    return jsonify({
+        "data": {"locations": data},
+        "meta": {"category": category or None, "status": status},
     })
 
 
@@ -1105,6 +1220,45 @@ def report_issue():
                 form_data=form_data,
                 field_errors=field_errors,
             ), 400
+
+        duplicate_issue = None
+        if request.form.get("submit_anyway") != "1":
+            candidates = query_db(
+                """
+                SELECT issue_id, title, status, created_at
+                FROM issues
+                WHERE location_id = ?
+                  AND category = ?
+                  AND status NOT IN ('resolved', 'closed')
+                  AND created_at >= datetime('now', '-7 days')
+                ORDER BY created_at DESC, issue_id DESC
+                """,
+                (location_id, form_data["category"]),
+            )
+
+            def normalized_title(value):
+                return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+            submitted_title = normalized_title(form_data["title"])
+            likely_matches = [
+                (difflib.SequenceMatcher(
+                    None, submitted_title, normalized_title(candidate["title"]), autojunk=False
+                ).ratio(), candidate)
+                for candidate in candidates
+            ]
+            likely_matches = [match for match in likely_matches if match[0] >= 0.78]
+            if likely_matches:
+                duplicate_issue = max(likely_matches, key=lambda match: (match[0], match[1]["created_at"]))[1]
+
+        if duplicate_issue is not None:
+            return render_template(
+                "report_issue.html",
+                categories=ISSUE_CATEGORIES,
+                locations=locations,
+                form_data=form_data,
+                field_errors={},
+                duplicate_issue=duplicate_issue,
+            )
 
         photo_path = None
         saved_photo = None

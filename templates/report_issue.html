@@ -41,6 +41,23 @@
             <div class="form-error-summary" id="form-error-summary" role="alert" aria-live="assertive" hidden></div>
             {% endif %}
 
+            {% if duplicate_issue %}
+            <section class="duplicate-warning" role="alert" aria-labelledby="duplicate-warning-heading">
+                <span class="duplicate-warning-mark" aria-hidden="true">!</span>
+                <div>
+                    <h2 id="duplicate-warning-heading">This may already have been reported</h2>
+                    <p>There is a similar unresolved report for this category and location from the last 7 days:</p>
+                    <dl>
+                        <div><dt>Issue</dt><dd>#{{ duplicate_issue['issue_id'] }} · {{ duplicate_issue['title'] }}</dd></div>
+                        <div><dt>Status</dt><dd>{{ duplicate_issue['status']|replace('_', ' ')|title }}</dd></div>
+                        <div><dt>Reported</dt><dd><time>{{ duplicate_issue['created_at'] }}</time></dd></div>
+                    </dl>
+                    <p class="duplicate-warning-note">If you attached a photo, please select it again before submitting.</p>
+                </div>
+            </section>
+            <input type="hidden" name="submit_anyway" value="1">
+            {% endif %}
+
             <div class="report-form-layout">
                 <div class="form-fields">
                     <div class="field field-full">
@@ -149,9 +166,9 @@
             <div class="form-footer">
                 <p class="required-note"><span class="required-mark">*</span> Required fields</p>
                 <div class="form-actions">
-                    <a class="button button-cancel" href="{{ url_for('home') }}">Cancel</a>
+                    <a class="button button-cancel" href="{{ url_for('my_reports') if duplicate_issue else url_for('home') }}">{{ 'Cancel this report' if duplicate_issue else 'Cancel' }}</a>
                     <button class="button button-submit" type="submit">
-                        Submit Report <span aria-hidden="true">&#8594;</span>
+                        {{ 'Submit anyway' if duplicate_issue else 'Submit Report' }} <span aria-hidden="true">&#8594;</span>
                     </button>
                 </div>
             </div>
