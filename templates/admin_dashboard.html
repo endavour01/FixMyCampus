@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#231e13">
+    <title>Admin Dashboard | Fix My Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_dashboard.css') }}">
+</head>
+<body class="admin-body">
+    <aside class="admin-sidebar" id="admin-sidebar">
+        <a class="admin-brand" href="{{ url_for('home') }}" aria-label="Fix My Campus home">
+            <span class="admin-brand-mark" aria-hidden="true">F</span>
+            <span><strong>Fix My Campus</strong><small>Campus services</small></span>
+        </a>
+        <div class="sidebar-profile">
+            <span class="profile-avatar" aria-hidden="true">{{ current_user['name'][0]|upper }}</span>
+            <span><strong>{{ current_user['name'] }}</strong><small>Administrator</small></span>
+        </div>
+        <nav class="sidebar-nav" aria-label="Dashboard navigation">
+            <span class="sidebar-label">Workspace</span>
+            <a class="sidebar-link is-active" href="#overview" aria-current="page"><span class="sidebar-icon" aria-hidden="true">&#9638;</span> Overview</a>
+            <a class="sidebar-link" href="#issues"><span class="sidebar-icon" aria-hidden="true">&#9776;</span> Issue reports</a>
+            <a class="sidebar-link" href="{{ url_for('admin_analytics') }}"><span class="sidebar-icon" aria-hidden="true">&#9635;</span> Analytics</a>
+            <span class="sidebar-label sidebar-label-spaced">Campus</span>
+            <a class="sidebar-link" href="{{ url_for('my_reports') }}"><span class="sidebar-icon" aria-hidden="true">&#9671;</span> Report directory</a>
+            <a class="sidebar-link" href="{{ url_for('home') }}"><span class="sidebar-icon" aria-hidden="true">&#8962;</span> Public homepage</a>
+        </nav>
+        <div class="sidebar-bottom">
+            <span class="sidebar-campus"><span class="online-dot" aria-hidden="true"></span> Campus workspace</span>
+            <form action="{{ url_for('logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="sidebar-logout" type="submit"><span aria-hidden="true">&#8594;</span> Sign out</button>
+            </form>
+            <small>Team Nexora · Fix My Campus</small>
+        </div>
+    </aside>
+    <button class="sidebar-backdrop" type="button" aria-label="Close dashboard navigation" data-sidebar-close hidden></button>
+
+    <div class="admin-app">
+        <header class="admin-topbar">
+            <div class="topbar-leading">
+                <button class="admin-menu-toggle" type="button" aria-expanded="false" aria-controls="admin-sidebar" aria-label="Open dashboard navigation" data-admin-menu-toggle>
+                    <span aria-hidden="true">&#9776;</span>
+                </button>
+                <span class="topbar-section">Operations <span aria-hidden="true">/</span> Dashboard</span>
+            </div>
+            <div class="topbar-trailing">
+                <span class="online-pill"><span class="online-dot" aria-hidden="true"></span> System online</span>
+                <time id="admin-current-date"></time>
+                <span class="topbar-avatar" aria-hidden="true">{{ current_user['name'][0]|upper }}</span>
+            </div>
+        </header>
+
+    <main class="admin-main" id="overview" data-api-url="{{ url_for('admin_issues_api') }}" data-detail-url="{{ url_for('issue_detail', issue_id=0) }}">
+        <div class="admin-heading">
+            <div>
+                <p class="admin-eyebrow"><span aria-hidden="true"></span> Campus operations</p>
+                <h1>Good day, {{ current_user['name'].split()[0] }}.</h1>
+                <p>Here’s what’s happening across your campus today.</p>
+            </div>
+            <a class="admin-refresh" href="{{ url_for('admin_dashboard') }}" aria-label="Reload dashboard page" title="Reload dashboard">&#8635;</a>
+        </div>
+
+        <section class="summary-grid overview-band" aria-label="Issue summary">
+            <article class="summary-card summary-total">
+                <span class="summary-label">Total Issues</span>
+                <strong class="summary-value" id="total-issues">--</strong>
+                <span class="summary-footnote">All submitted reports</span>
+            </article>
+            <article class="summary-card summary-pending">
+                <span class="summary-label">Pending</span>
+                <strong class="summary-value" id="pending-issues">--</strong>
+                <span class="summary-footnote">Awaiting action</span>
+            </article>
+            <article class="summary-card summary-progress">
+                <span class="summary-label">In Progress</span>
+                <strong class="summary-value" id="in-progress-issues">--</strong>
+                <span class="summary-footnote">Being worked on</span>
+            </article>
+            <article class="summary-card summary-resolved">
+                <span class="summary-label">Resolved</span>
+                <strong class="summary-value" id="resolved-issues">--</strong>
+                <span class="summary-footnote">Completed reports</span>
+            </article>
+        </section>
+
+        <a class="pending-callout" id="pending-callout" href="#issues" data-select-filter="status" data-select-value="pending">
+            <span class="callout-icon" aria-hidden="true">&#8987;</span>
+            <span class="callout-copy"><strong><span id="pending-callout-count">--</span> reports need review</strong><small>Open the queue to review and assign incoming issues.</small></span>
+            <span class="callout-arrow" aria-hidden="true">&#8250;</span>
+        </a>
+
+        <nav class="quick-actions" aria-label="Dashboard shortcuts">
+            <a class="quick-action" href="#issues" data-select-filter="status" data-select-value="pending">
+                <span class="quick-icon quick-icon-gold" aria-hidden="true">&#9745;</span><strong>Review queue</strong>
+            </a>
+            <a class="quick-action" href="{{ url_for('admin_analytics') }}">
+                <span class="quick-icon quick-icon-blue" aria-hidden="true">&#9643;</span><strong>Issue trends</strong>
+            </a>
+            <a class="quick-action" href="#issues" data-select-filter="category">
+                <span class="quick-icon quick-icon-violet" aria-hidden="true">&#9670;</span><strong>Browse categories</strong>
+            </a>
+            <a class="quick-action" href="#issues" data-select-filter="priority" data-select-value="critical">
+                <span class="quick-icon quick-icon-rose" aria-hidden="true">&#9888;</span><strong>Critical priority</strong>
+            </a>
+        </nav>
+
+        <section class="analytics-grid" id="analytics" aria-label="Issue analytics">
+            <article class="analytics-panel trend-panel">
+                <div class="analytics-heading">
+                    <div><h2>Issue activity</h2><p>Reports submitted over the last 14 days</p></div>
+                    <span class="analytics-period">14 days</span>
+                </div>
+                <canvas id="trend-chart" height="190" role="img" aria-label="Issue submissions over the last 14 days"></canvas>
+                <p class="chart-accessible-summary visually-hidden" id="trend-summary"></p>
+            </article>
+            <article class="analytics-panel status-panel">
+                <div class="analytics-heading">
+                    <div><h2>Status overview</h2><p>Current distribution of reports</p></div>
+                </div>
+                <div class="status-chart-layout">
+                    <div class="status-donut" id="status-donut" role="img" aria-label="Issue status distribution">
+                        <span class="donut-center"><strong id="donut-total">--</strong><small>issues</small></span>
+                    </div>
+                    <ul class="status-legend" id="status-legend" aria-label="Status counts"></ul>
+                </div>
+            </article>
+        </section>
+
+        <section class="issues-section" id="issues" aria-labelledby="issues-heading">
+            <div class="issues-section-heading">
+                <div>
+                    <h2 id="issues-heading">All reports</h2>
+                    <p id="table-count" aria-live="polite">Loading issue data…</p>
+                </div>
+            </div>
+
+            <form class="admin-filters" id="admin-filters" role="search">
+                <div class="admin-search-field">
+                    <label for="issue-search">Search</label>
+                    <input id="issue-search" name="q" type="search" placeholder="ID, title, student, or location" autocomplete="off">
+                </div>
+                <div class="admin-filter-field">
+                    <label for="filter-status">Status</label>
+                    <select id="filter-status" name="status">
+                        <option value="">All statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+                </div>
+                <div class="admin-filter-field">
+                    <label for="filter-category">Category</label>
+                    <select id="filter-category" name="category">
+                        <option value="">All categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="admin-filter-field">
+                    <label for="filter-location">Location</label>
+                    <select id="filter-location" name="location">
+                        <option value="">All locations</option>
+                    </select>
+                </div>
+                <div class="admin-filter-field">
+                    <label for="filter-priority">Priority</label>
+                    <select id="filter-priority" name="priority">
+                        <option value="">All priorities</option>
+                        <option value="low">Low</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+                <button class="filter-reset" id="reset-filters" type="button">Clear filters</button>
+            </form>
+
+            <div class="admin-state" id="admin-loading" role="status">
+                <span class="admin-spinner" aria-hidden="true"></span>
+                <span>Loading reports…</span>
+            </div>
+            <div class="admin-state admin-empty" id="admin-empty" hidden>
+                <h3>No reports found</h3>
+                <p id="empty-description">There are no reports to display yet.</p>
+                <button class="filter-reset" id="empty-reset" type="button" hidden>Clear filters</button>
+            </div>
+            <div class="admin-state admin-error" id="admin-error" role="alert" hidden>
+                <h3>Could not load reports</h3>
+                <p id="error-description">Check your connection and try again.</p>
+                <button class="filter-reset" id="retry-load" type="button">Retry</button>
+            </div>
+
+            <div class="table-wrap" id="table-wrap" hidden>
+                <table class="issues-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Issue</th>
+                            <th scope="col">Category</th>
+                            <th scope="col">Location</th>
+                            <th scope="col">Student</th>
+                            <th scope="col">Priority</th>
+                            <th scope="col">Submitted</th>
+                            <th scope="col">Status</th>
+                            <th scope="col"><span class="visually-hidden">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="issues-body"></tbody>
+                </table>
+            </div>
+
+            <div class="pagination" id="pagination" hidden>
+                <span id="page-description" aria-live="polite"></span>
+                <div class="pagination-actions">
+                    <button class="page-button" id="previous-page" type="button" aria-label="Previous page">&#8592; Previous</button>
+                    <button class="page-button" id="next-page" type="button" aria-label="Next page">Next &#8594;</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer admin-footer">
+        <span>Fix My Campus <span aria-hidden="true">·</span> Campus care, coordinated</span>
+        <span>Team Nexora</span>
+    </footer>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/admin_dashboard.js') }}" defer></script>
+</body>
+</html>

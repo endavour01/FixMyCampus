@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#231e13">
+    <title>Campus Analytics | Fix My Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_analytics.css') }}">
+</head>
+<body class="analytics-body">
+    <header class="analytics-header">
+        <a class="analytics-brand" href="{{ url_for('admin_dashboard') }}"><span>F</span><strong>Fix My Campus</strong></a>
+        <nav aria-label="Admin navigation">
+            <a href="{{ url_for('admin_dashboard') }}">Issue dashboard</a>
+            <a href="{{ url_for('admin_analytics') }}" aria-current="page">Analytics</a>
+            <form action="{{ url_for('logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit">Sign out</button>
+            </form>
+        </nav>
+    </header>
+
+    <main class="analytics-main" data-api-url="{{ url_for('admin_analytics_api') }}">
+        <div class="analytics-title-row">
+            <div>
+                <p class="analytics-eyebrow">Campus operations</p>
+                <h1>Issue analytics</h1>
+                <p>Understand what is being reported, where it happens, and how quickly issues are resolved.</p>
+            </div>
+            <a class="back-dashboard" href="{{ url_for('admin_dashboard') }}">← Issue dashboard</a>
+        </div>
+
+        <form class="date-filter" id="analytics-filter">
+            <div><label for="start-date">From</label><input id="start-date" name="start_date" type="date"></div>
+            <div><label for="end-date">Through</label><input id="end-date" name="end_date" type="date"></div>
+            <button type="submit">Apply dates</button>
+            <button class="clear-dates" id="clear-dates" type="button">Clear</button>
+            <p id="analytics-range" aria-live="polite">All reporting dates</p>
+        </form>
+
+        <p class="analytics-state" id="analytics-loading" role="status">Loading campus data…</p>
+        <p class="analytics-state analytics-error" id="analytics-error" role="alert" hidden></p>
+
+        <section class="analytics-metrics" aria-label="Issue metrics">
+            <article><span>Total issues</span><strong id="metric-total">—</strong><small>Reports submitted in this period</small></article>
+            <article><span>Unresolved issues</span><strong id="metric-unresolved">—</strong><small>Currently open or in progress</small></article>
+            <article><span>Resolution rate</span><strong id="metric-rate">—</strong><small>Resolved reports in this period</small></article>
+            <article><span>Average resolution time</span><strong id="metric-average">—</strong><small>Among reports with a recorded resolution</small></article>
+        </section>
+
+        <section class="analytics-charts" aria-label="Issue charts">
+            <article class="analytics-card">
+                <div><h2>Issues by category</h2><p>Report count for each issue type</p></div>
+                <div class="chart-wrap"><canvas id="category-chart" role="img" aria-label="Bar chart of issues by category"></canvas></div>
+            </article>
+            <article class="analytics-card">
+                <div><h2>Reports by location</h2><p>Report count across campus locations</p></div>
+                <div class="chart-wrap"><canvas id="location-chart" role="img" aria-label="Bar chart of reports by location"></canvas></div>
+            </article>
+            <article class="analytics-card monthly-card">
+                <div><h2>Monthly reporting trends</h2><p>Reports submitted per month</p></div>
+                <div class="chart-wrap"><canvas id="monthly-chart" role="img" aria-label="Line chart of monthly report submissions"></canvas></div>
+            </article>
+        </section>
+
+        <section class="hotspot-card" aria-labelledby="hotspot-heading">
+            <div class="hotspot-heading"><div><h2 id="hotspot-heading">Unresolved hotspots</h2><p>Locations with the most reports that still need attention</p></div></div>
+            <div class="hotspot-empty" id="hotspot-empty" hidden>No unresolved reports for this date range.</div>
+            <div class="hotspot-table-wrap" id="hotspot-table-wrap" hidden>
+                <table><thead><tr><th scope="col">Rank</th><th scope="col">Location</th><th scope="col">Unresolved reports</th></tr></thead><tbody id="hotspot-body"></tbody></table>
+            </div>
+        </section>
+    </main>
+
+    <footer class="analytics-footer">Fix My Campus <span>·</span> Campus care, coordinated</footer>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js" defer></script>
+    <script src="{{ url_for('static', filename='js/admin_analytics.js') }}" defer></script>
+</body>
+</html>

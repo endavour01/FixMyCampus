@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8f4">
+    <title>Issue #{{ issue['issue_id'] }} | Fix My Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/my_reports.css') }}">
+</head>
+<body>
+    <header class="site-header reports-header">
+        <a class="brand" href="{{ url_for('home') }}" aria-label="Fix My Campus home">
+            <span class="brand-mark" aria-hidden="true">F</span>
+            <span>Fix My Campus</span>
+        </a>
+        <a class="back-link" href="{{ url_for('my_reports') }}"><span aria-hidden="true">&#8592;</span> Back to Reports</a>
+    </header>
+
+    <main class="issue-detail-main">
+        <p class="reports-eyebrow"><span aria-hidden="true"></span> Report details</p>
+        <div class="detail-heading">
+            <div>
+                <p class="issue-id">Issue #{{ issue['issue_id'] }}</p>
+                <h1>{{ issue['title'] }}</h1>
+            </div>
+            {% set status_key = 'pending' if issue['status'] in ['submitted', 'under_review'] else issue['status'] %}
+            <span class="status-badge status-{{ status_key }}">{{ status_labels[issue['status']] }}</span>
+        </div>
+
+        <dl class="issue-metadata">
+            <div><dt>Category</dt><dd>{{ issue['category'] }}</dd></div>
+            <div><dt>Location</dt><dd>{{ issue['building_name'] }} · {{ issue['area_name'] }}</dd></div>
+            <div><dt>Submitted</dt><dd><time>{{ issue['created_at'] }}</time></dd></div>
+            <div><dt>Priority</dt><dd><span class="priority-badge priority-{{ issue['priority'] }}">{{ issue['priority']|title }}</span></dd></div>
+            {% if issue['assigned_to'] %}<div><dt>Assigned to</dt><dd>{{ issue['assigned_name'] or 'Authorized team member' }}</dd></div>{% endif %}
+        </dl>
+
+        <section class="detail-section" aria-labelledby="description-heading">
+            <h2 id="description-heading">Description</h2>
+            <p class="issue-description">{{ issue['description'] }}</p>
+        </section>
+
+        {% if current_user and current_user['role'] == 'admin' %}
+        <section class="detail-section admin-manage-section" aria-labelledby="manage-heading">
+            <h2 id="manage-heading">Manage report</h2>
+            <form
+                class="status-update-form"
+                id="issue-update-form"
+                data-patch-url="{{ url_for('issue_details_api', issue_id=issue['issue_id']) }}"
+                data-current-status="{{ 'pending' if issue['status'] in ['submitted', 'under_review'] else 'resolved' if issue['status'] in ['resolved', 'closed'] else issue['status'] }}"
+            >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div>
+                    <label for="issue-status">Update status</label>
+                    <select id="issue-status" name="status" required>
+                        <option value="pending" {% if issue['status'] in ['submitted', 'under_review'] %}selected{% endif %}>Pending</option>
+                        <option value="in_progress" {% if issue['status'] == 'in_progress' %}selected{% endif %}>In Progress</option>
+                        <option value="resolved" {% if issue['status'] in ['resolved', 'closed'] %}selected{% endif %}>Resolved</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="issue-priority">Priority</label>
+                    <select id="issue-priority" name="priority" required>
+                        <option value="low" {% if issue['priority'] == 'low' %}selected{% endif %}>Low</option>
+                        <option value="normal" {% if issue['priority'] == 'normal' %}selected{% endif %}>Normal</option>
+                        <option value="high" {% if issue['priority'] == 'high' %}selected{% endif %}>High</option>
+                        <option value="critical" {% if issue['priority'] == 'critical' %}selected{% endif %}>Critical</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="issue-assignee">Assign to</label>
+                    <select id="issue-assignee" name="assigned_to">
+                        <option value="">Unassigned</option>
+                        {% for assignee in assignees %}
+                        <option value="{{ assignee['user_id'] }}" {% if issue['assigned_to'] == assignee['user_id'] %}selected{% endif %}>
+                            {{ assignee['name'] }} · {{ 'Maintenance' if assignee['role'] == 'maintenance' else 'Admin' }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="status-comment-field">
+                    <label for="status-comment">Update note <span>Optional</span></label>
+                    <textarea id="status-comment" name="comment" rows="3" maxlength="500" placeholder="Add a brief note for the student"></textarea>
+                </div>
+                <div class="status-update-actions">
+                    <p class="status-update-feedback" id="status-update-feedback" role="status" aria-live="polite"></p>
+                    <button class="button button-primary" type="submit">Save changes</button>
+                </div>
+            </form>
+        </section>
+        {% endif %}
+
+        {% if issue['photo_path'] %}
+        <section class="detail-section" aria-labelledby="photo-heading">
+            <h2 id="photo-heading">Attached photo</h2>
+            <img class="issue-photo" src="{{ url_for('static', filename=issue['photo_path']) }}" alt="Photo attached to issue {{ issue['issue_id'] }}">
+        </section>
+        {% endif %}
+
+        <section class="detail-section history-section" aria-labelledby="history-heading">
+            <h2 id="history-heading">Status history</h2>
+            <ol class="history-list">
+                {% for update in history %}
+                <li class="history-item">
+                    <span class="history-marker" aria-hidden="true"></span>
+                    <div class="history-copy">
+                        <div class="history-title-row">
+                            <strong>{{ 'Assignment updated' if update['event_type'] == 'assignment' else status_labels[update['new_status']] }}</strong>
+                            <time>{{ update['updated_at'] }}</time>
+                        </div>
+                        {% if update['event_type'] == 'assignment' %}
+                        <p>{{ update['old_assignee_name'] or 'Unassigned' }} &rarr; {{ update['new_assignee_name'] or 'Unassigned' }}</p>
+                        {% endif %}
+                        {% if update['comment'] %}<p>{{ update['comment'] }}</p>{% endif %}
+                        <span class="history-author">Updated by {{ update['updated_by_name'] or 'Campus team' }}</span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ol>
+        </section>
+    </main>
+
+    <footer class="site-footer reports-footer">
+        <div class="page-width footer-inner">
+            <a class="brand brand-footer" href="{{ url_for('home') }}">
+                <span class="brand-mark" aria-hidden="true">F</span>
+                <span>Fix My Campus</span>
+            </a>
+            <p>See it. Report it. Fix it.</p>
+            <span class="footer-credit">Made for campus communities by Team Nexora</span>
+        </div>
+    </footer>
+    {% if current_user and current_user['role'] == 'admin' %}
+    <script src="{{ url_for('static', filename='js/issue_details.js') }}" defer></script>
+    {% endif %}
+</body>
+</html>

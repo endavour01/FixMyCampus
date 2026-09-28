@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#241f14">
+    <title>{{ 'All Reports' if is_admin else 'My Reports' }} | Fix My Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/my_reports.css') }}">
+</head>
+<body class="student-body">
+    <aside class="student-sidebar" id="student-sidebar">
+        <a class="student-brand" href="{{ url_for('home') }}" aria-label="Fix My Campus home">
+            <span class="student-brand-mark" aria-hidden="true">F</span>
+            <span><strong>Fix My Campus</strong><small>Student portal</small></span>
+        </a>
+        <div class="student-profile">
+            <span class="student-avatar" aria-hidden="true">{{ current_user['name'][0]|upper }}</span>
+            <span><strong>{{ current_user['name'] }}</strong><small>Student account</small></span>
+        </div>
+        <nav class="student-nav" aria-label="Student navigation">
+            <span class="student-nav-label">Workspace</span>
+            <a class="student-nav-link is-active" href="{{ url_for('my_reports') }}" aria-current="page"><span aria-hidden="true">&#9638;</span> My reports</a>
+            <a class="student-nav-link" href="{{ url_for('report_issue') }}"><span aria-hidden="true">&#10010;</span> Report an issue</a>
+            <span class="student-nav-label student-nav-spaced">Campus</span>
+            <a class="student-nav-link" href="{{ url_for('home') }}"><span aria-hidden="true">&#8962;</span> Campus homepage</a>
+        </nav>
+        <div class="student-sidebar-bottom">
+            <span><span class="student-online-dot" aria-hidden="true"></span> Student workspace</span>
+            <form action="{{ url_for('logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit"><span aria-hidden="true">&#8594;</span> Sign out</button>
+            </form>
+            <small>Team Nexora · Fix My Campus</small>
+        </div>
+    </aside>
+    <button class="student-sidebar-backdrop" type="button" aria-label="Close student navigation" data-student-sidebar-close hidden></button>
+
+    <div class="student-app">
+        <header class="student-topbar">
+            <div class="student-topbar-leading">
+                <button class="student-menu-toggle" type="button" aria-expanded="false" aria-controls="student-sidebar" aria-label="Open student navigation" data-student-menu-toggle>&#9776;</button>
+                <span>Student workspace <span aria-hidden="true">/</span> My reports</span>
+            </div>
+            <span class="student-topbar-date" id="student-current-date"></span>
+            <span class="student-topbar-avatar" aria-hidden="true">{{ current_user['name'][0]|upper }}</span>
+        </header>
+
+    <main class="reports-main student-main" id="student-overview" data-api-url="{{ url_for('my_reports_api') }}" data-issue-url="{{ url_for('issue_detail', issue_id=0) }}">
+        <div class="reports-heading student-heading">
+            <div>
+                <p class="reports-eyebrow"><span aria-hidden="true"></span> Your campus activity</p>
+                <h1>Welcome back, {{ current_user['name'].split()[0] }}.</h1>
+                <p>Keep track of the campus issues you’ve reported.</p>
+            </div>
+            <a class="button button-primary reports-create" href="{{ url_for('report_issue') }}"><span aria-hidden="true">+</span> New report</a>
+        </div>
+
+        <section class="student-summary-grid" aria-label="Your report summary">
+            <article class="student-summary-card student-summary-total"><span>Total reports</span><strong id="student-total-reports">--</strong><small>Submitted by you</small></article>
+            <article class="student-summary-card student-summary-pending"><span>Pending</span><strong id="student-pending-reports">--</strong><small>Awaiting action</small></article>
+            <article class="student-summary-card student-summary-progress"><span>In progress</span><strong id="student-progress-reports">--</strong><small>Being worked on</small></article>
+            <article class="student-summary-card student-summary-resolved"><span>Resolved</span><strong id="student-resolved-reports">--</strong><small>Completed</small></article>
+        </section>
+
+        <a class="student-pending-callout" id="student-pending-callout" href="#student-reports" data-student-filter="status" data-student-value="pending">
+            <span class="student-callout-icon" aria-hidden="true">&#8987;</span>
+            <span><strong><span id="student-pending-callout-count">--</span> of your reports need attention</strong><small>Check the latest update from your campus team.</small></span>
+            <span class="student-callout-arrow" aria-hidden="true">&#8250;</span>
+        </a>
+
+        <nav class="student-quick-actions" aria-label="Report shortcuts">
+            <a href="{{ url_for('report_issue') }}"><span class="student-quick-icon student-quick-gold" aria-hidden="true">&#10010;</span><strong>Report an issue</strong></a>
+            <a href="#student-reports" data-student-filter="status" data-student-value="pending"><span class="student-quick-icon student-quick-blue" aria-hidden="true">&#8635;</span><strong>Track pending</strong></a>
+            <a href="#student-analytics"><span class="student-quick-icon student-quick-violet" aria-hidden="true">&#9643;</span><strong>View activity</strong></a>
+        </nav>
+
+        <section class="student-analytics-grid" id="student-analytics" aria-label="Your report analytics">
+            <article class="student-analytics-panel">
+                <div class="student-analytics-heading"><div><h2>Your report activity</h2><p>Submissions over the last 14 days</p></div><span>14 days</span></div>
+                <canvas id="student-trend-chart" height="180" role="img" aria-label="Your reports submitted over the last 14 days"></canvas>
+                <p class="visually-hidden" id="student-trend-summary"></p>
+            </article>
+            <article class="student-analytics-panel">
+                <div class="student-analytics-heading"><div><h2>Status overview</h2><p>Where your reports stand</p></div></div>
+                <div class="student-status-chart">
+                    <div class="student-status-donut" id="student-status-donut" role="img" aria-label="Your report status distribution">
+                        <span><strong id="student-donut-total">--</strong><small>reports</small></span>
+                    </div>
+                    <ul id="student-status-legend" aria-label="Your status counts"></ul>
+                </div>
+            </article>
+        </section>
+
+        <section class="student-reports-section" id="student-reports" aria-labelledby="student-reports-title">
+            <div class="student-reports-heading"><div><h2 id="student-reports-title">Your reports</h2><p id="results-count" aria-live="polite" hidden></p></div></div>
+            <section class="report-filters" id="report-filters" aria-label="Search and filter reports" hidden>
+                <div class="search-field"><label for="report-search">Search reports</label><input id="report-search" type="search" placeholder="Title, issue ID, or location"></div>
+                <div class="filter-field"><label for="category-filter">Category</label><select id="category-filter"><option value="">All categories</option>{% for category in categories %}<option value="{{ category }}">{{ category }}</option>{% endfor %}</select></div>
+                <div class="filter-field"><label for="status-filter">Status</label><select id="status-filter"><option value="">All statuses</option><option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="resolved">Resolved</option></select></div>
+            </section>
+            <section class="reports-state student-loading" id="reports-loading" role="status"><span class="state-mark loading-mark" aria-hidden="true"></span><h2>Loading your reports</h2><p>Your latest campus updates are on their way.</p></section>
+            <section class="reports-state" id="reports-signed-out" hidden><span class="state-mark signed-out-mark" aria-hidden="true">i</span><h2>Sign in to see your reports</h2><p>Your session may have expired. Sign in again to continue.</p><a class="button button-secondary" href="{{ url_for('login') }}">Sign in</a></section>
+            <section class="reports-state" id="reports-empty" hidden><span class="state-mark empty-mark" aria-hidden="true"><svg viewBox="0 0 36 36" fill="none"><path d="M10 5.5h11l6 6v19H10v-25Z"/><path d="M21 5.5v7h6M14 19h9M14 23h9"/></svg></span><h2>No reports yet</h2><p>When you report a campus issue, you’ll be able to follow its progress here.</p><a class="button button-primary" href="{{ url_for('report_issue') }}">Report Your First Issue <span aria-hidden="true">&#8594;</span></a></section>
+            <section class="reports-state" id="reports-no-results" hidden><span class="state-mark signed-out-mark" aria-hidden="true">?</span><h2>No matching reports</h2><p>Try changing your search or filters.</p><button class="button button-secondary" id="clear-filters" type="button">Clear filters</button></section>
+            <section class="reports-state reports-error" id="reports-error" hidden><span class="state-mark error-mark" aria-hidden="true">!</span><h2>We couldn’t load your reports</h2><p id="error-message">Check your connection and try again.</p><button class="button button-secondary" id="retry-reports" type="button">Try again</button></section>
+            <section class="report-list" id="report-list" aria-label="Submitted reports" hidden></section>
+        </section>
+    </main>
+
+    <footer class="student-footer"><span>Fix My Campus <span aria-hidden="true">·</span> See it. Report it. Fix it.</span><span>Team Nexora</span></footer>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/my_reports.js') }}" defer></script>
+</body>
+</html>

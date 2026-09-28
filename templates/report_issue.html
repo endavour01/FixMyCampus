@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8f4">
+    <title>Report an Issue | Fix My Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/report_issue.css') }}">
+</head>
+<body>
+    <header class="site-header report-header">
+        <a class="brand" href="{{ url_for('home') }}" aria-label="Fix My Campus home">
+            <span class="brand-mark" aria-hidden="true">F</span>
+            <span>Fix My Campus</span>
+        </a>
+        <a class="back-link" href="{{ url_for('home') }}"><span aria-hidden="true">&#8592;</span> Back to home</a>
+    </header>
+
+    <main class="report-main">
+        <div class="report-heading">
+            <p class="report-eyebrow"><span aria-hidden="true"></span> Help improve your campus</p>
+            <h1>Report an Issue</h1>
+            <p>Share a few details so the campus team knows what needs attention and where to find it.</p>
+        </div>
+
+        {% if request.args.get('submitted') == '1' %}
+        <div class="success-message" role="status">
+            <span class="success-mark" aria-hidden="true">&#10003;</span>
+            <span>Your report has been submitted. Thank you for helping improve campus.</span>
+        </div>
+        {% endif %}
+
+        <form class="report-form" id="report-form" action="{{ url_for('report_issue') }}" method="post" enctype="multipart/form-data" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if field_errors %}
+            <div class="form-error-summary" id="form-error-summary" role="alert" aria-live="assertive">
+                Please review the highlighted fields before submitting your report.
+            </div>
+            {% else %}
+            <div class="form-error-summary" id="form-error-summary" role="alert" aria-live="assertive" hidden></div>
+            {% endif %}
+
+            <div class="report-form-layout">
+                <div class="form-fields">
+                    <div class="field field-full">
+                        <label for="title">Issue title <span class="required-mark">*</span></label>
+                        <input
+                            id="title"
+                            name="title"
+                            type="text"
+                            maxlength="120"
+                            placeholder="A short summary of the issue"
+                            value="{{ form_data.get('title', '') }}"
+                            autocomplete="off"
+                            required
+                            aria-describedby="title-error"
+                            {% if field_errors.get('title') %}aria-invalid="true"{% endif %}
+                        >
+                        <p class="field-error" id="title-error">{{ field_errors.get('title', '') }}</p>
+                    </div>
+
+                    <div class="field field-full">
+                        <label for="description">Description <span class="required-mark">*</span></label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            rows="5"
+                            maxlength="2000"
+                            placeholder="What happened? Include any details that could help the team."
+                            required
+                            aria-describedby="description-error"
+                            {% if field_errors.get('description') %}aria-invalid="true"{% endif %}
+                        >{{ form_data.get('description', '') }}</textarea>
+                        <p class="field-error" id="description-error">{{ field_errors.get('description', '') }}</p>
+                    </div>
+
+                    <div class="field">
+                        <label for="category">Category <span class="required-mark">*</span></label>
+                        <select
+                            id="category"
+                            name="category"
+                            required
+                            aria-describedby="category-error"
+                            {% if field_errors.get('category') %}aria-invalid="true"{% endif %}
+                        >
+                            <option value="">Choose a category</option>
+                            {% for category in categories %}
+                            <option value="{{ category }}" {% if form_data.get('category') == category %}selected{% endif %}>{{ category }}</option>
+                            {% endfor %}
+                        </select>
+                        <p class="field-error" id="category-error">{{ field_errors.get('category', '') }}</p>
+                    </div>
+
+                    <div class="field field-full">
+                        <label for="location-id">Campus location <span class="required-mark">*</span></label>
+                        <select
+                            id="location-id"
+                            name="location_id"
+                            required
+                            aria-describedby="location-id-error"
+                            {% if field_errors.get('location_id') %}aria-invalid="true"{% endif %}
+                        >
+                            <option value="">Choose a building and area</option>
+                            {% for location in locations %}
+                            <option value="{{ location['location_id'] }}" {% if form_data.get('location_id')|string == location['location_id']|string %}selected{% endif %}>
+                                {{ location['building_name'] }} · {{ location['area_name'] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <p class="field-error" id="location-id-error">{{ field_errors.get('location_id', '') }}</p>
+                    </div>
+                </div>
+
+                <aside class="photo-field">
+                    <div class="photo-heading">
+                        <label for="photo">Add a photo <span class="optional-label">Optional</span></label>
+                        <p>A photo can help the team understand the issue.</p>
+                    </div>
+                    <div class="upload-box">
+                        <span class="upload-icon" aria-hidden="true">
+                            <svg viewBox="0 0 32 32" fill="none"><path d="M16 21V6M10.5 11.5 16 6l5.5 5.5M7 20v6h18v-6"/></svg>
+                        </span>
+                        <p class="upload-title">Choose an image to attach</p>
+                        <p class="upload-help" id="photo-help">JPEG, PNG, or WebP. Maximum file size: 5 MB.</p>
+                        <input
+                            class="photo-input"
+                            id="photo"
+                            name="photo"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                            aria-describedby="photo-help photo-error"
+                            {% if field_errors.get('photo') %}aria-invalid="true"{% endif %}
+                        >
+                        <label class="upload-button" for="photo">Browse files</label>
+                        <p class="selected-file" id="selected-file">No file selected</p>
+                    </div>
+                    <p class="field-error photo-error" id="photo-error">{{ field_errors.get('photo', '') }}</p>
+                    <figure class="photo-preview" id="photo-preview" hidden>
+                        <img id="preview-image" alt="Preview of selected report photo">
+                        <figcaption>
+                            <span id="preview-filename"></span>
+                            <button class="remove-photo" type="button" id="remove-photo" aria-label="Remove selected photo">Remove</button>
+                        </figcaption>
+                    </figure>
+                </aside>
+            </div>
+
+            <div class="form-footer">
+                <p class="required-note"><span class="required-mark">*</span> Required fields</p>
+                <div class="form-actions">
+                    <a class="button button-cancel" href="{{ url_for('home') }}">Cancel</a>
+                    <button class="button button-submit" type="submit">
+                        Submit Report <span aria-hidden="true">&#8594;</span>
+                    </button>
+                </div>
+            </div>
+        </form>
+    </main>
+
+    <footer class="report-footer">
+        <div class="page-width report-footer-inner">
+            <span>Fix My Campus</span>
+            <span>Made for campus communities by Team Nexora</span>
+        </div>
+    </footer>
+    <script src="{{ url_for('static', filename='js/report_issue.js') }}" defer></script>
+</body>
+</html>

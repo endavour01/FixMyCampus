@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8f4">
+    <title>Create Student Account | Fix My Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-body">
+    <header class="site-header auth-header">
+        <a class="brand" href="{{ url_for('home') }}" aria-label="Fix My Campus home">
+            <span class="brand-mark" aria-hidden="true">F</span>
+            <span>Fix My Campus</span>
+        </a>
+        <a class="back-link" href="{{ url_for('home') }}"><span aria-hidden="true">&#8592;</span> Back to home</a>
+    </header>
+
+    <main class="auth-main auth-main-register">
+        <section class="auth-panel" aria-labelledby="auth-title">
+            <p class="auth-eyebrow"><span aria-hidden="true"></span> Join your campus community</p>
+            <h1 id="auth-title">Create an account</h1>
+            <p class="auth-intro">Use your college email to submit reports and follow their progress.</p>
+
+            <form class="auth-form" action="{{ url_for('register') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="auth-field">
+                    <label for="name">Full name</label>
+                    <input id="name" name="name" type="text" value="{{ form_data.get('name', '') }}" autocomplete="name" maxlength="100" required autofocus aria-describedby="name-error">
+                    <p class="auth-field-error" id="name-error">{{ errors.get('name', '') }}</p>
+                </div>
+                <div class="auth-field">
+                    <label for="email">College email</label>
+                    <input id="email" name="email" type="email" value="{{ form_data.get('email', '') }}" autocomplete="email" maxlength="254" required aria-describedby="email-help email-error">
+                    {% if college_email_domain %}
+                    <p class="auth-help" id="email-help">Use your {{ college_email_domain }} email address.</p>
+                    {% else %}
+                    <p class="auth-help" id="email-help">Use an email address issued by your college.</p>
+                    {% endif %}
+                    <p class="auth-field-error" id="email-error">{{ errors.get('email', '') }}</p>
+                </div>
+                <div class="auth-field">
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required aria-describedby="password-help password-error">
+                    <p class="auth-help" id="password-help">At least 12 characters, including a letter and a number.</p>
+                    <p class="auth-field-error" id="password-error">{{ errors.get('password', '') }}</p>
+                </div>
+                <div class="auth-field">
+                    <label for="confirm-password">Confirm password</label>
+                    <input id="confirm-password" name="confirm_password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required aria-describedby="confirm-password-error">
+                    <p class="auth-field-error" id="confirm-password-error">{{ errors.get('confirm_password', '') }}</p>
+                </div>
+                <button class="button button-primary auth-submit" type="submit">Create student account</button>
+            </form>
+
+            <p class="auth-switch">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+        </section>
+    </main>
+
+    <footer class="auth-footer">
+        <div class="page-width report-footer-inner">
+            <span>Fix My Campus</span>
+            <span>See it. Report it. Fix it.</span>
+        </div>
+    </footer>
+</body>
+</html>

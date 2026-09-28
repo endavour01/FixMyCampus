@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8f4">
+    <title>Sign In | Fix My Campus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-body">
+    <header class="site-header auth-header">
+        <a class="brand" href="{{ url_for('home') }}" aria-label="Fix My Campus home">
+            <span class="brand-mark" aria-hidden="true">F</span>
+            <span>Fix My Campus</span>
+        </a>
+        <a class="back-link" href="{{ url_for('home') }}"><span aria-hidden="true">&#8592;</span> Back to home</a>
+    </header>
+
+    <main class="auth-main">
+        <section class="auth-panel" aria-labelledby="auth-title">
+            <p class="auth-eyebrow"><span aria-hidden="true"></span> Welcome back</p>
+            <h1 id="auth-title">Sign in</h1>
+            <p class="auth-intro">Sign in to follow your campus reports.</p>
+
+            {% if error %}
+            <p class="auth-alert" id="login-error" role="alert">{{ error }}</p>
+            {% endif %}
+
+            <form class="auth-form" action="{{ url_for('login', next=next_url) if next_url else url_for('login') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+                <div class="auth-field">
+                    <label for="email">College email</label>
+                    <input id="email" name="email" type="email" value="{{ email }}" autocomplete="email" maxlength="254" required autofocus>
+                </div>
+                <div class="auth-field">
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required>
+                </div>
+                <button class="button button-primary auth-submit" type="submit">Sign in</button>
+            </form>
+
+            <p class="auth-switch">New to Fix My Campus? <a href="{{ url_for('register') }}">Create a student account</a></p>
+        </section>
+    </main>
+
+    <footer class="auth-footer">
+        <div class="page-width report-footer-inner">
+            <span>Fix My Campus</span>
+            <span>See it. Report it. Fix it.</span>
+        </div>
+    </footer>
+</body>
+</html>

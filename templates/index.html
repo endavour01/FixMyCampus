@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f7f8f4">
+    <meta name="description" content="Help make your campus better. Report issues, follow progress, and improve the spaces you share.">
+    <title>Fix My Campus | Make Your Campus Better</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="#home" aria-label="Fix My Campus home">
+            <span class="brand-mark" aria-hidden="true">F</span>
+            <span>Fix My Campus</span>
+        </a>
+
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
+            <span class="menu-icon" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span class="visually-hidden">Open navigation</span>
+        </button>
+
+        <nav class="site-nav" id="site-nav" aria-label="Main navigation" data-site-nav>
+            <a class="nav-link is-current" href="#home" aria-current="page">Home</a>
+            <a class="nav-link" href="{{ url_for('report_issue') }}">Report an Issue</a>
+            <a class="nav-link" href="{{ url_for('my_reports') }}">My Reports</a>
+            {% if current_user and current_user['role'] == 'admin' %}
+            <a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a>
+            {% endif %}
+            {% if current_user %}
+            <form class="nav-logout-form" action="{{ url_for('logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="nav-login" type="submit">Log out</button>
+            </form>
+            {% else %}
+            <a class="nav-login" href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero page-width" id="home" aria-labelledby="hero-title">
+            <div class="hero-copy">
+                <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> Campus care, made collaborative</p>
+                <h1 id="hero-title">Make Your<br class="desktop-break"> Campus <span>Better</span></h1>
+                <p class="hero-description">See something that needs attention? Let your campus team know, follow what happens next, and help make shared spaces better for everyone.</p>
+                <div class="hero-actions">
+                    <a class="button button-primary" id="report" href="{{ url_for('report_issue') }}">
+                        Report an Issue
+                        <span class="button-arrow" aria-hidden="true">&#8599;</span>
+                    </a>
+                    <a class="text-link" href="#how-it-works">See how it works <span aria-hidden="true">&#8594;</span></a>
+                </div>
+                <p class="hero-note"><span class="note-mark" aria-hidden="true">&#10003;</span> Your campus. Your voice. Real progress.</p>
+            </div>
+
+            <figure class="hero-visual">
+                <div class="photo-frame">
+                    <img
+                        src="https://images.unsplash.com/photo-1562774053-701939374585?auto=format&amp;fit=crop&amp;w=1400&amp;q=85"
+                        alt="University campus building surrounded by trees and green space"
+                        fetchpriority="high"
+                    >
+                    <span class="photo-index" aria-hidden="true">01 / OUR CAMPUS</span>
+                </div>
+                <figcaption>Better spaces begin with people who care.</figcaption>
+            </figure>
+        </section>
+
+        <section class="features-section" id="features" aria-labelledby="features-title">
+            <div class="page-width">
+                <div class="section-heading">
+                    <p class="eyebrow">Small actions, shared impact</p>
+                    <h2 id="features-title">A better campus starts with you.</h2>
+                </div>
+
+                <div class="feature-grid">
+                    <article class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 32 32" fill="none"><path d="M16 4.5 27 10.75v10.5L16 27.5 5 21.25v-10.5L16 4.5Z"/><path d="M16 15.75 27 9.5M16 15.75 5 9.5M16 15.75v11.5M11.25 7.2l11 6.25"/></svg>
+                        </span>
+                        <h3>Easy Reporting</h3>
+                        <p>Share a campus issue with a few clear details, right from wherever you are.</p>
+                    </article>
+
+                    <article class="feature-card" id="feature-progress">
+                        <span class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 32 32" fill="none"><path d="M6 24.5V17M13 24.5V11M20 24.5V15M27 24.5V7.5"/><path d="m5 11 7-5 7 4 8-6"/><path d="M23 4h4v4"/></svg>
+                        </span>
+                        <h3>Track Progress</h3>
+                        <p>Stay in the loop as your report moves from submitted to resolved.</p>
+                    </article>
+
+                    <article class="feature-card">
+                        <span class="feature-icon" aria-hidden="true">
+                            <svg viewBox="0 0 32 32" fill="none"><path d="M7 26V13.5L16 7l9 6.5V26H7Z"/><path d="M12 26v-8h8v8M4 26h24M11 12V7h3"/><path d="m22.5 4 .8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/></svg>
+                        </span>
+                        <h3>Better Campus</h3>
+                        <p>Turn everyday observations into a more welcoming place to learn and connect.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="steps-section" id="how-it-works" aria-labelledby="steps-title">
+            <div class="page-width">
+                <div class="steps-intro">
+                    <p class="eyebrow">Three simple steps</p>
+                    <h2 id="steps-title">From noticed to sorted.</h2>
+                    <p>It only takes a moment to help your campus team take action.</p>
+                </div>
+                <ol class="steps-list">
+                    <li class="step">
+                        <span class="step-number">01</span>
+                        <h3>Spot it</h3>
+                        <p>Notice something on campus that needs care or attention.</p>
+                    </li>
+                    <li class="step">
+                        <span class="step-number">02</span>
+                        <h3>Report it</h3>
+                        <p>Tell us what happened and where the team can find it.</p>
+                    </li>
+                    <li class="step">
+                        <span class="step-number">03</span>
+                        <h3>Follow it</h3>
+                        <p>Check in on progress as your campus team works on a fix.</p>
+                    </li>
+                </ol>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer" id="footer">
+        <div class="page-width footer-inner">
+            <a class="brand brand-footer" href="#home">
+                <span class="brand-mark" aria-hidden="true">F</span>
+                <span>Fix My Campus</span>
+            </a>
+            <p>See it. Report it. Fix it.</p>
+            <span class="footer-credit">Made for campus communities by Team Nexora <span aria-hidden="true">&copy;</span> <span id="current-year"></span></span>
+        </div>
+    </footer>
+    <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>
