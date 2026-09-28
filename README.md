@@ -39,6 +39,17 @@ flask --app app run --debug --port 5003
 
 Open <http://127.0.0.1:5003> in your browser. If port 5003 is already in use, choose another port with `--port`.
 
+## Automated Tests
+
+Install the development dependencies and run the test suite with pytest:
+
+```bash
+python -m pip install -r requirements-dev.txt
+pytest
+```
+
+The tests use separate temporary SQLite databases and upload folders. They do not read or modify the local development database.
+
 Flask creates the `instance/` directory and initializes `instance/campus.db` automatically. Existing database records are preserved during initialization and schema upgrades.
 
 ## Accounts

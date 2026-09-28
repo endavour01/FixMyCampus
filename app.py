@@ -68,8 +68,8 @@ class UploadValidationError(ValueError):
 app = Flask(__name__, instance_relative_config=True)
 app.config.update(
     SECRET_KEY=os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32),
-    DATABASE=os.path.join(app.instance_path, "campus.db"),
-    UPLOAD_FOLDER=os.path.join(app.instance_path, "uploads"),
+    DATABASE=os.environ.get("FIX_MY_CAMPUS_DATABASE", os.path.join(app.instance_path, "campus.db")),
+    UPLOAD_FOLDER=os.environ.get("FIX_MY_CAMPUS_UPLOAD_FOLDER", os.path.join(app.instance_path, "uploads")),
     MAX_CONTENT_LENGTH=MAX_PHOTO_SIZE + 256 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -1044,8 +1044,6 @@ def issue_history_api(issue_id):
         LEFT JOIN users AS old_assignee ON old_assignee.user_id = issue_history.old_assigned_to
         LEFT JOIN users AS new_assignee ON new_assignee.user_id = issue_history.new_assigned_to
         WHERE issue_history.issue_id = ?
-                        "total": summary["total"],
-                        "summary": dict(summary),
         """,
         (issue_id,),
     )
