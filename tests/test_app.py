@@ -1,4 +1,6 @@
 from io import BytesIO
+import json
+import re
 
 from PIL import Image
 
@@ -33,6 +35,31 @@ def test_registration_creates_student_and_rejects_invalid_or_duplicate_email(cli
     assert client.post("/register", data=register_payload(password="short", confirm_password="short")).status_code == 400
 
 
+def test_page_routes_render_for_their_intended_roles(client, helpers, login_user):
+    def assert_rendered_assets_exist(path):
+        response = client.get(path)
+        assert response.status_code == 200, path
+        html = response.get_data(as_text=True)
+        for asset in re.findall(r'(?:href|src)="([^"]+)"', html):
+            if asset.startswith("/static/"):
+                assert client.get(asset).status_code == 200, asset
+
+    assert_rendered_assets_exist("/")
+    assert_rendered_assets_exist("/register")
+    assert_rendered_assets_exist("/login")
+    student = helpers["create_user"]()
+    issue_id = helpers["create_report"](student)
+    login_user(client)
+    assert_rendered_assets_exist("/report")
+    assert_rendered_assets_exist("/my-reports")
+    assert_rendered_assets_exist(f"/issues/{issue_id}")
+    client.post("/logout")
+    helpers["create_user"](name="Admin", email="admin@example.edu", role="admin")
+    login_user(client, "admin@example.edu")
+    for path in ("/admin", "/admin/analytics", "/admin/map", "/my-reports", f"/issues/{issue_id}"):
+        assert_rendered_assets_exist(path)
+
+
 def test_login_logout_and_bad_password(client, helpers, login_user):
     helpers["create_user"]()
     assert login_user(client).status_code == 302
@@ -42,6 +69,28 @@ def test_login_logout_and_bad_password(client, helpers, login_user):
     response = client.post("/login", data={"email": "student@example.edu", "password": "incorrect"})
     assert response.status_code == 401
     assert b"incorrect" in response.data.lower()
+
+
+def test_csrf_rejects_mutating_post_without_token(client, app, monkeypatch):
+    monkeypatch.setitem(app.config, "WTF_CSRF_ENABLED", True)
+    response = client.post("/login", data={"email": "student@example.edu", "password": PASSWORD})
+    assert response.status_code == 400
+
+
+def test_admin_cli_creates_first_admin_and_refuses_a_second(app):
+    runner = app.test_cli_runner()
+    created = runner.invoke(
+        args=["create-admin"],
+        input=f"Campus Admin\nadmin@example.edu\n{PASSWORD}\n{PASSWORD}\n",
+    )
+    assert created.exit_code == 0, created.output
+    with app.app_context():
+        admin = query_db("SELECT role FROM users WHERE email = ?", ("admin@example.edu",), one=True)
+        assert admin["role"] == "admin"
+
+    second = runner.invoke(args=["create-admin"], input="Another Admin\nanother@example.edu\n")
+    assert second.exit_code != 0
+    assert "already exists" in second.output
 
 
 def test_role_based_access_control_for_admin_pages_and_updates(client, helpers, login_user):
@@ -107,7 +156,13 @@ def test_valid_image_upload_is_sanitized_stored_privately_and_malformed_upload_r
         assert path.is_file()
         assert path.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
     assert client.get(f"/issues/{issue['issue_id']}/photo").status_code == 200
+    helpers["create_user"](name="Other Student", email="other@example.edu")
+    client.post("/logout")
+    login_user(client, "other@example.edu")
+    assert client.get(f"/issues/{issue['issue_id']}/photo").status_code == 404
 
+    client.post("/logout")
+    login_user(client)
     bad_type = client.post(
         "/report", data={**fields, "title": "Second report", "photo": (BytesIO(b"not an image"), "bad.png")},
         content_type="multipart/form-data",
@@ -166,6 +221,25 @@ def test_admin_status_update_validation_missing_issue_and_history(client, app, h
     assert client.get("/api/issues/9999/history").status_code == 404
 
 
+def test_admin_issue_api_filters_pagination_and_dashboard_fields(client, helpers, login_user):
+    student = helpers["create_user"]()
+    issue_id = helpers["create_report"](student, title="Leaking sink", category="Water")
+    helpers["create_report"](student, title="Broken chair", category="Furniture")
+    helpers["create_user"](name="Admin", email="admin@example.edu", role="admin")
+    login_user(client, "admin@example.edu")
+
+    response = client.get("/api/admin/issues?category=Water&status=pending&page=1&per_page=1")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["meta"]["total"] == 1
+    assert payload["meta"]["pages"] == 1
+    assert payload["data"]["issues"][0]["issue_id"] == issue_id
+    assert payload["data"]["issues"][0]["description"] == "A chair is broken in the room."
+    assert payload["meta"]["filters"]["locations"]
+    assert client.get("/api/admin/issues?per_page=101").status_code == 400
+    assert client.get("/api/admin/issues?location=invalid").status_code == 400
+
+
 def test_analytics_metrics_categories_hotspots_and_date_validation(client, app, helpers, login_user):
     student = helpers["create_user"]()
     unresolved_id = helpers["create_report"](student, title="Loose chair", category="Furniture")
@@ -200,3 +274,38 @@ def test_analytics_metrics_categories_hotspots_and_date_validation(client, app, 
     assert payload["hotspots"][0]["unresolved"] == 1
     assert client.get("/api/admin/analytics?start_date=not-a-date").status_code == 400
     assert client.get("/api/admin/analytics?start_date=2025-02-01&end_date=2025-01-01").status_code == 400
+
+
+def test_admin_map_page_filters_reports_and_exposes_only_configured_coordinates(
+    client, app, helpers, login_user, monkeypatch
+):
+    student = helpers["create_user"]()
+    location_id = helpers["location_id"]()
+    pending_issue = helpers["create_report"](student, title="Chair problem", category="Furniture", location=location_id)
+    resolved_issue = helpers["create_report"](student, title="Old light issue", category="Lighting", status="resolved", location=location_id)
+    helpers["create_user"](name="Admin", email="admin@example.edu", role="admin")
+    with app.app_context():
+        location = query_db(
+            "SELECT building_name, area_name FROM locations WHERE location_id = ?",
+            (location_id,), one=True,
+        )
+    key = f"{location['building_name']}|{location['area_name']}"
+    monkeypatch.setitem(app.config, "CAMPUS_LOCATION_COORDINATES", json.dumps({key: [26.7759, 75.8745]}))
+
+    login_user(client, "admin@example.edu")
+    assert client.get("/admin/map").status_code == 200
+    filtered_response = client.get("/api/admin/map?category=Furniture&status=pending")
+    assert filtered_response.status_code == 200
+    locations = filtered_response.get_json()["data"]["locations"]
+    selected_location = next(item for item in locations if item["location_id"] == location_id)
+    assert (selected_location["latitude"], selected_location["longitude"]) == (26.7759, 75.8745)
+    assert selected_location["unresolved_count"] == 1
+    assert [item["issue_id"] for item in selected_location["reports"]] == [pending_issue]
+    assert "user_id" not in selected_location["reports"][0]
+    assert "email" not in selected_location["reports"][0]
+
+    resolved = client.get("/api/admin/map?status=resolved").get_json()["data"]["locations"]
+    selected_resolved = next(item for item in resolved if item["location_id"] == location_id)
+    assert [item["issue_id"] for item in selected_resolved["reports"]] == [resolved_issue]
+    assert selected_resolved["unresolved_count"] == 1
+    assert client.get("/api/admin/map?status=invalid").status_code == 400

@@ -786,6 +786,7 @@ def admin_issues_api():
         SELECT
             issues.issue_id,
             issues.title,
+            issues.description,
             issues.category,
             issues.priority,
             issues.status,

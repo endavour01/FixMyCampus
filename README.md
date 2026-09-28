@@ -1,141 +1,200 @@
 # Fix My Campus
 
-A college campus issue-reporting project built by Team Nexora with Python, Flask, SQLite, HTML, CSS, and vanilla JavaScript.
+Fix My Campus is a Flask web application for reporting and tracking campus maintenance issues. Students can submit reports and follow their own reports. Administrators can review reports, update their status and priority, assign maintenance staff, view campus analytics, and browse reports by campus location.
 
-Students can report campus issues, follow their status, and review update history. Administrators can search and manage all reports. Maintenance accounts can be assigned to issues.
+The application uses Python, Flask, SQLite, Jinja templates, and browser JavaScript. It is intended for local development and classroom or campus project use. The Flask development server is not a production deployment server.
+
+## Features
+
+- Public home, registration, and login pages.
+- Student registration creates student accounts only. Admin and maintenance accounts are created through Flask CLI commands.
+- Issue reports with title, description, category, predefined building/area, and optional image.
+- Student report list, category/status filters, report details, and status history. Students can only access their own reports.
+- Admin dashboard with search, filters, pagination, report assignment, priority changes, and status updates. Resolving a report requires an admin comment.
+- Admin analytics for totals, unresolved issues, resolution rate, average resolution time, issue counts by category/location, monthly report trends, and unresolved hotspots. Analytics can be filtered by report submission dates.
+- Admin campus map with category and status filters, unresolved report counts, report popups, and an accessible location/report list.
+- A duplicate report warning for unresolved issues at the same location/category reported within seven days. Students choose whether to continue; reports are never automatically merged or deleted.
+- CSRF protection for form submissions and admin API updates, signed sessions, and role-based route access.
+
+## Architecture
+
+- `app.py` defines Flask pages, JSON APIs, authentication, authorization, upload validation, and account CLI commands.
+- `database.py` defines SQLite access, schema initialization, migrations, and issue creation/history helpers.
+- SQLite is the only application database. The normal local database is `instance/campus.db`; SQLite tables are created on application startup.
+- Jinja templates render pages and expose Flask-generated API URLs through `data-*` attributes. Page JavaScript reads those URLs instead of hardcoding application hostnames.
+- CSS and browser JavaScript are served from `static/`.
+- Chart.js and Leaflet are loaded from public CDNs. Leaflet map tiles come from OpenStreetMap.
 
 ## Requirements
 
 - Python 3.12 or newer
-- pip
+- `pip`
+- Internet access in the browser for Chart.js, Leaflet, and OpenStreetMap map tiles
 
-## Set Up Locally
+## Fresh Local Installation
 
-From the project folder, create and activate a virtual environment, then install the dependencies:
+Run these commands from the repository directory.
+
+1. Create and activate a virtual environment:
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+
+   On Windows PowerShell, activate it with `.venv\Scripts\Activate.ps1`.
+
+2. Install application dependencies:
+
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+
+3. Set a stable secret key for signed sessions. Generate your own value and keep it out of source control:
+
+   ```bash
+   export FLASK_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+   ```
+
+   If `FLASK_SECRET_KEY` is omitted, the application generates a temporary key at startup. Sessions will not survive an application restart in that case.
+
+4. Optionally limit new registrations to a college email domain:
+
+   ```bash
+   export COLLEGE_EMAIL_DOMAIN="your-college.edu"
+   ```
+
+   Omit this setting to allow any syntactically valid email domain.
+
+5. Start Flask:
+
+   ```bash
+   flask --app app run --debug --port 5003
+   ```
+
+6. Open <http://127.0.0.1:5003>.
+
+The first application startup creates `instance/`, initializes `instance/campus.db`, creates the schema, and inserts the predefined starter locations if they are missing. The schema initializer includes migrations for earlier database layouts. Back up your database and uploads before upgrading. Uploaded images are stored in the private `instance/uploads/` directory.
+
+For local development, leave `FLASK_COOKIE_SECURE` unset. For HTTPS deployments set it to `1` so browsers send the session cookie only over HTTPS. Do not use Flask's debug server for public production hosting.
+
+## Accounts and Roles
+
+Create the first administrator from an activated virtual environment:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
+flask --app app create-admin
 ```
 
-Set a session secret before starting the app. Generate a new value for your own environment; do not commit it to the project:
+The command interactively requests the name, email, and password; the password is hidden while typing. It refuses to create another admin when an admin account already exists.
+
+Create a maintenance account that can be assigned to a report:
 
 ```bash
-export FLASK_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+flask --app app create-maintenance
 ```
 
-Optionally restrict registration to your college's email domain:
+Students register at `/register`. Passwords must contain at least 12 characters, a letter, and a number. Public registration cannot select or create privileged roles. Sign in at `/login`; logout is a CSRF-protected POST action.
+
+| Role | Access |
+| --- | --- |
+| Public | Homepage, registration, login |
+| Student | Submit reports; list, view, and track their own reports |
+| Maintenance | Sign in; can be assigned to reports. No maintenance-specific dashboard is implemented. |
+| Admin | Dashboard, all reports, issue updates, analytics, and campus map |
+
+## Pages and APIs
+
+| Page or endpoint | Purpose | Access |
+| --- | --- | --- |
+| `/` | Homepage | Public |
+| `/register`, `/login` | Account registration and sign in | Public |
+| `/logout` | Sign out; POST with CSRF token | Signed-in user |
+| `/report` | Submit a report and optional photo | Student |
+| `/my-reports` | Report portal | Student or admin |
+| `/issues/<id>` | Report details and history | Owner student or admin |
+| `/issues/<id>/photo` | Private report photo | Owner student or admin |
+| `/admin` | Admin issue dashboard | Admin |
+| `/admin/analytics` | Analytics page | Admin |
+| `/admin/map` | Campus map and location list | Admin |
+| `/api/my-reports` and `/api/reports` | List/search the current user's reports; admins see all reports | Student or admin |
+| `/api/issues/<id>` | Read a report; admin PATCH updates status, assignee, priority, and comment | Owner student/admin for GET; admin for PATCH |
+| `/api/issues/<id>/history` | Read report status and assignment history | Owner student or admin |
+| `/api/admin/issues` | Filtered and paginated admin report data | Admin |
+| `/api/admin/analytics` | Date-filtered metrics and chart/hotspot data | Admin |
+| `/api/admin/map` | Filtered location counts and report summaries | Admin |
+
+Admin issue filters are `q`, `status`, `category`, `location`, and `priority`; pagination uses `page` and `per_page`. Status changes follow the application's allowed transitions. Resolutions require a comment. Priorities are `low`, `normal`, `high`, and `critical`.
+
+Analytics accept optional `start_date` and `end_date` in `YYYY-MM-DD` format, based on report creation dates. Average resolution time is calculated from the issue creation time to its first `resolved` or `closed` status-history timestamp. Reports without a resolution history do not contribute to that average.
+
+## Campus Map Coordinates
+
+The map uses the approximate campus-center coordinate `(26.7759, 75.8745)` for its initial view. That point is **not** assigned to individual buildings. No individual marker appears until verified coordinates are configured for that exact location.
+
+Set `CAMPUS_LOCATION_COORDINATES` to a JSON object. Each key must exactly match a database location in the form `Building Name|Area Name`; each value is `[latitude, longitude]`:
 
 ```bash
-export COLLEGE_EMAIL_DOMAIN="your-college.edu"
+export CAMPUS_LOCATION_COORDINATES='{"Building Name|Area Name":[LATITUDE,LONGITUDE]}'
 ```
 
-Start the development server:
+Replace the example key and coordinate values with verified values for each location. Do not put the campus-center point under every building. The app does not request student geolocation or include reporter names/emails in map responses. The location/report list still works when coordinates are absent. OpenStreetMap attribution is displayed; use of its public tile service is subject to the [OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 
-```bash
-flask --app app run --debug --port 5003
+## Issue Photos
+
+The report form accepts JPEG, PNG, and WebP files up to 5 MB. The server checks the extension, file signature, decoded format, dimensions, and frame count, then re-encodes the image and assigns a random filename. Files are kept under `instance/uploads/`, outside Flask's public static directory. The photo route checks report ownership before returning a file. The original client filename is not used as a storage path.
+
+At startup, the app attempts to move referenced legacy files from `static/uploads/` into private storage. Invalid or missing legacy images are skipped; back up an existing database and uploads before upgrading a deployed copy.
+
+## Duplicate Report Warning
+
+Before saving a report, the app checks unresolved reports from the last seven days at the same location and in the same category. It lowercases titles, removes punctuation, and compares them with `difflib.SequenceMatcher`; a score of 0.78 or higher can trigger a warning. A student can cancel or submit anyway. The heuristic can miss different descriptions of the same issue and flag similar titles about separate issues. If the warning appears, the browser requires the student to select the photo again before resubmitting.
+
+## Database Tables
+
+- `users`: student, maintenance, and admin accounts with password hashes and roles.
+- `locations`: predefined building, area, and floor records used by report forms and the map.
+- `issues`: report text, category, location, status, priority, assignee, timestamp, and private photo path.
+- `issue_history`: initial submission, status changes, comments, and assignment changes.
+
+SQLite connections enable foreign-key checks. The schema initializer creates tables and indexes and includes migrations for older application schemas. You can direct the app to a separate database or upload folder with `FIX_MY_CAMPUS_DATABASE` and `FIX_MY_CAMPUS_UPLOAD_FOLDER`; tests use these settings to isolate startup and request data from the development database.
+
+## Project Structure
+
+```text
+FixMyCampus/
+├── app.py                    Flask app, routes, security, uploads, CLI commands
+├── database.py               SQLite schema, migrations, and query helpers
+├── requirements.txt          Runtime dependencies
+├── requirements-dev.txt      Runtime dependencies plus pytest
+├── README.md                 Setup, feature, and limitation documentation
+├── tests/
+│   ├── conftest.py           Isolated temporary database and test fixtures
+│   └── test_app.py           Flask route, database, auth, upload, and analytics tests
+├── instance/                 Created on startup; local database and private uploads
+├── templates/                Jinja pages for public, student, and admin views
+└── static/
+    ├── css/                  Page stylesheets
+    └── js/                   Page interactions and API clients
 ```
 
-Open <http://127.0.0.1:5003> in your browser. If port 5003 is already in use, choose another port with `--port`.
+## Tests
 
-## Automated Tests
-
-Install the development dependencies and run the test suite with pytest:
+Install development dependencies and run the tests:
 
 ```bash
 python -m pip install -r requirements-dev.txt
 pytest
 ```
 
-The tests use separate temporary SQLite databases and upload folders. They do not read or modify the local development database.
+Tests point app startup and each test fixture at temporary SQLite databases and upload directories. They do not modify `instance/campus.db` or the regular upload directory.
 
-Flask creates the `instance/` directory and initializes `instance/campus.db` automatically. Existing database records are preserved during initialization and schema upgrades.
+## Known Limitations
 
-## Accounts
-
-Create the first administrator with the interactive Flask CLI command. It prompts for the account name, college email, and password without putting the password in shell history:
-
-```bash
-flask --app app create-admin
-```
-
-Create an assignable maintenance account the same way:
-
-```bash
-flask --app app create-maintenance
-```
-
-Public registration always creates a student account. It collects a name, email, and password; passwords must be at least 12 characters and include a letter and a number. If `COLLEGE_EMAIL_DOMAIN` is set, registration is restricted to that exact domain.
-
-Sign-in and registration are available at `/login` and `/register`. Signing out uses a CSRF-protected POST request. Session cookies are HttpOnly and SameSite=Lax. For HTTPS deployments, set `FLASK_COOKIE_SECURE=1`; leave it unset for local HTTP development. Set a stable `FLASK_SECRET_KEY` in the server environment so sessions remain valid across restarts.
-
-## Main Routes
-
-| Route                      | Purpose                                           | Access                                          |
-| -------------------------- | ------------------------------------------------- | ----------------------------------------------- |
-| `/`                        | Public homepage                                   | Public                                          |
-| `/register`                | Create a student account                          | Public                                          |
-| `/login`                   | Sign in                                           | Public                                          |
-| `/logout`                  | Sign out                                          | Signed-in user, POST with CSRF token            |
-| `/report`                  | Submit an issue with an optional photo            | Student                                         |
-| `/my-reports`              | View and filter submitted reports                 | Student or admin                                |
-| `/issues/<id>`             | View issue details and status history             | Owner student or admin                          |
-| `/admin`                   | Admin dashboard                                   | Admin                                           |
-| `/admin/analytics`         | Campus issue analytics and date-filtered charts   | Admin                                           |
-| `/admin/map`               | Campus location map and report list               | Admin                                           |
-| `/api/my-reports`          | List the current user's reports                   | Student or admin                                |
-| `/api/reports`             | Search/filter reports                             | Student or admin                                |
-| `/api/admin/issues`        | Filtered, paginated issue list and summary counts | Admin                                           |
-| `/api/admin/analytics`     | Date-filtered metrics, charts, and unresolved hotspots | Admin                                      |
-| `/api/admin/map`           | Filtered campus location counts and report summaries | Admin                                       |
-| `/api/issues/<id>`         | Get issue details; admins can update with PATCH   | Owner student or admin for GET; admin for PATCH |
-| `/api/issues/<id>/history` | Get issue status and assignment history           | Owner student or admin                          |
-
-Admin issue filters include `q`, `status`, `category`, `location`, and `priority`; pagination uses `page` and `per_page`. The PATCH endpoint accepts JSON fields `status`, `assigned_to`, `priority`, and `comment`. Resolving an issue requires a comment. Valid priorities are `low`, `normal`, `high`, and `critical`.
-
-The admin analytics page reports total and unresolved issues, resolution rate, average resolution time, issue counts by category and location, monthly submission trends, and locations with the most unresolved reports. An optional start and end date filters reports by their submission date. Resolution time uses the issue creation timestamp and the first resolved or closed status timestamp recorded in issue history. Charts use Chart.js loaded from jsDelivr.
-
-The admin issue map uses Leaflet and OpenStreetMap tiles. It is centered on the provided approximate campus coordinate (26.7759, 75.8745). Configure verified per-location coordinates in the `CAMPUS_LOCATION_COORDINATES` environment variable as a JSON object whose keys are `Building Name|Area Name` and whose values are `[latitude, longitude]`. Configure the actual coordinates for each location already listed in the `locations` table; until then, its report list remains available but it has no individual map marker. The map does not use browser geolocation or expose reporter identity or personal location data. OpenStreetMap tile use requires visible attribution and must follow the [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
-
-## Issue Photos
-
-The report form accepts JPEG, PNG, and WebP images up to 5 MB. Pillow decodes and re-encodes each image after checking its format and dimensions, and the app assigns a generated filename. Files are stored under the private `instance/uploads/` directory and served only through an owner/admin checked route. Original client filenames are not used as disk paths. Legacy referenced files are moved out of `static/uploads/` at startup.
-
-## Duplicate Report Warning
-
-When a student submits a report, the app checks unresolved reports from the previous seven days at the same location and in the same category. It lowercases titles, removes punctuation, and compares them with Python's `difflib.SequenceMatcher`; a similarity score of 0.78 or higher displays the closest match for review. Students can cancel or submit their report anyway. The warning never merges or deletes reports. This title-only heuristic can miss differently worded reports about the same problem and can flag similar titles about separate problems. If the warning is shown, an attached photo must be selected again before choosing to submit anyway.
-
-## Project Structure
-
-```text
-FixMyCampus/
-|-- app.py                     Flask routes, authentication, authorization, and CLI commands
-|-- database.py                SQLite schema, initialization, migrations, and query helpers
-|-- requirements.txt           Python dependencies
-|-- instance/
-|   |-- campus.db              Automatically created SQLite database
-|   `-- uploads/               Private issue photos
-|-- templates/
-|   |-- index.html             Public homepage
-|   |-- login.html             Sign-in form
-|   |-- register.html          Student registration form
-|   |-- report_issue.html      New issue form
-|   |-- my_reports.html        Student report portal
-|   |-- issue_details.html     Issue details and history
-|   |-- admin_dashboard.html   Admin dashboard
-|   |-- admin_analytics.html  Admin issue analytics
-|   `-- admin_map.html        Admin campus map and accessible report list
-`-- static/
-    |-- css/                   Page stylesheets
-    `-- js/                    Vanilla JavaScript, Chart.js, and Leaflet interactions
-```
-
-## Notes
-
-- SQLite connections enable foreign-key enforcement.
-- Form POST requests and admin PATCH requests are CSRF-protected.
-- Students can only view their own reports. Admin report access and management are role-protected.
-- Keep `.venv/`, secrets, and the generated database out of version control. The repository `.gitignore` already excludes the virtual environment and local database.
-- Email verification and password reset are not currently implemented.
-# FixMyCampus
+- Email verification and password reset are not implemented.
+- Maintenance accounts can be assigned but have no dedicated dashboard.
+- Duplicate detection is a title similarity heuristic, not semantic matching.
+- The starter location names are generic project data; verify or replace them for your campus.
+- Individual map markers require verified coordinates. The supplied campus center is only an initial map view.
+- Chart.js, Leaflet, and OpenStreetMap tiles require an internet connection in the browser.
+- The Flask built-in server and debug mode are for local development only.

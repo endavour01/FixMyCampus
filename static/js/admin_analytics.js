@@ -51,14 +51,14 @@ if (analyticsPage) {
         const categories = data.categories;
         replaceChart("categories", "category-chart", {
             type: "bar",
-            data: { labels: categories.map((item) => item.label), datasets: [{ data: categories.map((item) => item.count), backgroundColor: "#719176", borderRadius: 4, maxBarThickness: 42 }] },
+            data: { labels: categories.map((item) => item.label), datasets: [{ data: categories.map((item) => item.count), backgroundColor: "#c18a16", borderRadius: 4, maxBarThickness: 42 }] },
             options: chartOptions(),
         });
 
         const locations = data.locations.slice(0, 12);
         replaceChart("locations", "location-chart", {
             type: "bar",
-            data: { labels: locations.map(formatLocation), datasets: [{ data: locations.map((item) => item.count), backgroundColor: "#c18a36", borderRadius: 4, maxBarThickness: 34 }] },
+            data: { labels: locations.map(formatLocation), datasets: [{ data: locations.map((item) => item.count), backgroundColor: "#806018", borderRadius: 4, maxBarThickness: 34 }] },
             options: { ...chartOptions(true), scales: { ...chartOptions(true).scales, y: { ...chartOptions(true).scales.y, grid: { display: false } } } },
         });
 
@@ -69,7 +69,7 @@ if (analyticsPage) {
                     const [year, month] = item.month.split("-").map(Number);
                     return new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" }).format(new Date(year, month - 1, 1));
                 }),
-                datasets: [{ label: "Reports", data: data.monthly.map((item) => item.count), borderColor: "#4b7c61", backgroundColor: "rgba(75, 124, 97, 0.15)", fill: true, tension: 0.25, pointRadius: 3 }],
+                datasets: [{ label: "Reports", data: data.monthly.map((item) => item.count), borderColor: "#b78412", backgroundColor: "rgba(204, 148, 17, 0.15)", fill: true, tension: 0.25, pointRadius: 3 }],
             },
             options: {
                 responsive: true,
