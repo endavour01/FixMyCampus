@@ -6,15 +6,18 @@ import re
 import secrets
 import sqlite3
 import uuid
+import warnings
+from io import BytesIO
 from datetime import date, timedelta
 from functools import wraps
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
-from flask import Flask, abort, g, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, abort, g, jsonify, redirect, render_template, request, send_file, session, url_for
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.security import check_password_hash, generate_password_hash
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from database import (
     create_issue,
@@ -58,11 +61,15 @@ PHOTO_SIGNATURES = {
     ".webp": lambda content: content[:4] == b"RIFF" and content[8:12] == b"WEBP",
 }
 
+
+class UploadValidationError(ValueError):
+    """A user-facing validation failure for an uploaded image."""
+
 app = Flask(__name__, instance_relative_config=True)
 app.config.update(
     SECRET_KEY=os.environ.get("FLASK_SECRET_KEY") or secrets.token_hex(32),
     DATABASE=os.path.join(app.instance_path, "campus.db"),
-    UPLOAD_FOLDER=os.path.join(app.static_folder, "uploads"),
+    UPLOAD_FOLDER=os.path.join(app.instance_path, "uploads"),
     MAX_CONTENT_LENGTH=MAX_PHOTO_SIZE + 256 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -159,6 +166,81 @@ def password_error(password):
     return None
 
 
+def sanitize_uploaded_image(content, extension):
+    """Decode and re-encode a bounded raster image, discarding untrusted metadata."""
+    expected_formats = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG", ".webp": "WEBP"}
+    expected_format = expected_formats.get(extension)
+    if not expected_format:
+        raise UploadValidationError("Choose a JPEG, PNG, or WebP image.")
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(content)) as image:
+                if image.format != expected_format:
+                    raise UploadValidationError("The selected file does not match its image type.")
+                if image.width * image.height > 20_000_000:
+                    raise UploadValidationError("The image dimensions are too large.")
+                if getattr(image, "n_frames", 1) != 1:
+                    raise UploadValidationError("Animated images are not supported.")
+                image.verify()
+
+            with Image.open(BytesIO(content)) as image:
+                image = ImageOps.exif_transpose(image)
+                image.load()
+                if expected_format == "JPEG":
+                    image = image.convert("RGB")
+                elif expected_format == "PNG" and image.mode not in {"RGB", "RGBA", "L", "LA", "P"}:
+                    image = image.convert("RGBA")
+                elif expected_format == "WEBP" and image.mode not in {"RGB", "RGBA"}:
+                    image = image.convert("RGBA")
+
+                output = BytesIO()
+                save_options = {"quality": 90, "method": 4} if expected_format == "WEBP" else {}
+                if expected_format == "JPEG":
+                    save_options = {"quality": 90, "optimize": True}
+                image.save(output, format=expected_format, **save_options)
+                sanitized = output.getvalue()
+                if len(sanitized) > MAX_PHOTO_SIZE:
+                    raise UploadValidationError("The processed image must be 5 MB or smaller.")
+                return sanitized
+    except UploadValidationError:
+        raise
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning, UnidentifiedImageError, OSError, SyntaxError, ValueError) as error:
+        raise UploadValidationError("Choose a valid JPEG, PNG, or WebP image.") from error
+
+
+def migrate_legacy_uploaded_photos():
+    """Move referenced uploads out of Flask's public static directory."""
+    public_uploads = (Path(app.static_folder) / "uploads").resolve()
+    private_uploads = Path(app.config["UPLOAD_FOLDER"]).resolve()
+    private_uploads.mkdir(parents=True, exist_ok=True)
+    for issue in query_db("SELECT issue_id, photo_path FROM issues WHERE photo_path IS NOT NULL"):
+        stored_path = issue["photo_path"] or ""
+        parts = Path(stored_path).parts
+        if len(parts) != 2 or parts[0] != "uploads" or "\\" in stored_path:
+            continue
+        filename = parts[1]
+        extension = Path(filename).suffix.lower()
+        if Path(filename).name != filename or extension not in ALLOWED_PHOTO_EXTENSIONS:
+            continue
+        source = (public_uploads / filename).resolve()
+        destination = (private_uploads / filename).resolve()
+        try:
+            source.relative_to(public_uploads)
+            destination.relative_to(private_uploads)
+        except ValueError:
+            continue
+        if not source.is_file() or destination.exists():
+            continue
+        try:
+            sanitized = sanitize_uploaded_image(source.read_bytes(), extension)
+        except (OSError, ValueError):
+            continue
+        destination.write_bytes(sanitized)
+        source.unlink()
+
+
 def is_safe_redirect(target):
     if not target:
         return False
@@ -176,6 +258,21 @@ def start_user_session(user):
 @app.context_processor
 def inject_current_user():
     return {"current_user": get_current_user()}
+
+
+@app.before_request
+def block_public_issue_uploads():
+    """Keep legacy upload URLs private while issue photos move out of static/."""
+    static_file = request.view_args.get("filename", "") if request.endpoint == "static" and request.view_args else ""
+    if static_file == "uploads" or static_file.startswith("uploads/"):
+        abort(404)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    return response
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -782,6 +879,7 @@ def serialize_issue(issue):
         "status": issue["status"],
         "created_at": issue["created_at"],
         "photo_path": issue["photo_path"],
+        "photo_url": url_for("issue_photo", issue_id=issue["issue_id"]) if issue["photo_path"] else None,
         "location": {
             "building_name": issue["building_name"],
             "area_name": issue["area_name"],
@@ -1005,6 +1103,38 @@ def issue_detail(issue_id):
     )
 
 
+@app.route("/issues/<int:issue_id>/photo")
+@login_required
+@roles_required("student", "admin")
+def issue_photo(issue_id):
+    issue = issue_for_user(issue_id, g.current_user)
+    if issue is None or not issue["photo_path"]:
+        abort(404)
+
+    stored_path = issue["photo_path"]
+    parts = Path(stored_path).parts
+    if len(parts) != 2 or parts[0] != "uploads" or "\\" in stored_path:
+        abort(404)
+    filename = parts[1]
+    extension = Path(filename).suffix.lower()
+    if Path(filename).name != filename or extension not in ALLOWED_PHOTO_EXTENSIONS:
+        abort(404)
+
+    upload_directory = Path(app.config["UPLOAD_FOLDER"]).resolve()
+    photo_path = (upload_directory / filename).resolve()
+    try:
+        photo_path.relative_to(upload_directory)
+    except ValueError:
+        abort(404)
+    if not photo_path.is_file():
+        abort(404)
+
+    image_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+    response = send_file(photo_path, mimetype=image_types[extension], conditional=True, max_age=0)
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
+
+
 @app.route("/api/issues/<int:issue_id>", methods=["PATCH"])
 @login_required
 @roles_required("admin")
@@ -1211,6 +1341,11 @@ def report_issue():
                     field_errors["photo"] = "The image must be 5 MB or smaller."
                 elif not PHOTO_SIGNATURES[photo_extension](photo_content):
                     field_errors["photo"] = "The selected file does not match its image type."
+                else:
+                    try:
+                        photo_content = sanitize_uploaded_image(photo_content, photo_extension)
+                    except UploadValidationError as error:
+                        field_errors["photo"] = str(error)
 
         if field_errors:
             return render_template(
@@ -1317,5 +1452,9 @@ def handle_large_upload(error):
     ), 413
 
 
+with app.app_context():
+    migrate_legacy_uploaded_photos()
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()

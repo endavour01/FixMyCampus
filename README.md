@@ -89,7 +89,7 @@ The admin issue map uses Leaflet and OpenStreetMap tiles. It is centered on the 
 
 ## Issue Photos
 
-The report form accepts JPEG, PNG, and WebP images up to 5 MB. The server checks both the file extension and image signature, assigns a generated filename, and stores uploads under `static/uploads/`. Original client filenames are not used as disk paths.
+The report form accepts JPEG, PNG, and WebP images up to 5 MB. Pillow decodes and re-encodes each image after checking its format and dimensions, and the app assigns a generated filename. Files are stored under the private `instance/uploads/` directory and served only through an owner/admin checked route. Original client filenames are not used as disk paths. Legacy referenced files are moved out of `static/uploads/` at startup.
 
 ## Duplicate Report Warning
 
@@ -104,6 +104,7 @@ FixMyCampus/
 |-- requirements.txt           Python dependencies
 |-- instance/
 |   |-- campus.db              Automatically created SQLite database
+|   `-- uploads/               Private issue photos
 |-- templates/
 |   |-- index.html             Public homepage
 |   |-- login.html             Sign-in form
@@ -115,9 +116,8 @@ FixMyCampus/
 |   |-- admin_analytics.html  Admin issue analytics
 |   `-- admin_map.html        Admin campus map and accessible report list
 `-- static/
-|-- css/                   Page stylesheets
-|-- js/                    Vanilla JavaScript, Chart.js, and Leaflet interactions
-`-- uploads/               Uploaded issue photos
+    |-- css/                   Page stylesheets
+    `-- js/                    Vanilla JavaScript, Chart.js, and Leaflet interactions
 ```
 
 ## Notes

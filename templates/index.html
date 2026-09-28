@@ -3,12 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f7f8f4">
+    <meta name="theme-color" content="#241f14">
     <meta name="description" content="Help make your campus better. Report issues, follow progress, and improve the spaces you share.">
     <title>Fix My Campus | Make Your Campus Better</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
 </head>
-<body>
+<body class="home-page">
     <header class="site-header">
         <a class="brand" href="#home" aria-label="Fix My Campus home">
             <span class="brand-mark" aria-hidden="true">F</span>
@@ -21,9 +22,11 @@
         </button>
 
         <nav class="site-nav" id="site-nav" aria-label="Main navigation" data-site-nav>
-            <a class="nav-link is-current" href="#home" aria-current="page">Home</a>
-            <a class="nav-link" href="{{ url_for('report_issue') }}">Report an Issue</a>
-            <a class="nav-link" href="{{ url_for('my_reports') }}">My Reports</a>
+            <div class="liquid-nav" aria-label="Campus pages">
+                <a class="nav-link is-current" href="#home" aria-current="page">Home</a>
+                <a class="nav-link" href="{{ url_for('report_issue') }}">Report an Issue</a>
+                <a class="nav-link" href="{{ url_for('my_reports') }}">My Reports</a>
+            </div>
             {% if current_user and current_user['role'] == 'admin' %}
             <a class="nav-link" href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a>
             {% endif %}
@@ -61,7 +64,7 @@
                         alt="University campus building surrounded by trees and green space"
                         fetchpriority="high"
                     >
-                    <span class="photo-index" aria-hidden="true">01 / OUR CAMPUS</span>
+                    <span class="photo-index" aria-hidden="true">OUR CAMPUS</span>
                 </div>
                 <figcaption>Better spaces begin with people who care.</figcaption>
             </figure>

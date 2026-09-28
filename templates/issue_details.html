@@ -94,7 +94,7 @@
         {% if issue['photo_path'] %}
         <section class="detail-section" aria-labelledby="photo-heading">
             <h2 id="photo-heading">Attached photo</h2>
-            <img class="issue-photo" src="{{ url_for('static', filename=issue['photo_path']) }}" alt="Photo attached to issue {{ issue['issue_id'] }}">
+            <img class="issue-photo" src="{{ url_for('issue_photo', issue_id=issue['issue_id']) }}" alt="Photo attached to issue {{ issue['issue_id'] }}">
         </section>
         {% endif %}
 
