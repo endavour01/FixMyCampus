@@ -170,6 +170,24 @@
 @media (max-width: 520px) {
     .auth-header {
         width: min(100% - 2rem, 1200px);
+        min-height: 66px;
+        gap: 0.5rem;
+    }
+
+    .auth-header .brand {
+        gap: 0.45rem;
+        font-size: 0.9rem;
+    }
+
+    .auth-header .brand-mark {
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+    }
+
+    .auth-header .back-link {
+        gap: 0.25rem;
+        font-size: 0.76rem;
     }
 
     .auth-main {
@@ -178,7 +196,7 @@
     }
 
     .auth-panel {
-        padding: 1.4rem;
+        padding: clamp(1rem, 5vw, 1.4rem);
     }
 
     .auth-panel h1 {

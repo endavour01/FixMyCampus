@@ -745,11 +745,57 @@
     .report-page .report-header {
         width: 100%;
         min-height: 64px;
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         gap: 0.75rem;
+        padding-block: 0.65rem;
     }
 
     .report-page .back-link {
         white-space: nowrap;
+    }
+}
+
+@media (max-width: 420px) {
+    .report-page .report-header {
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding-inline: 0.75rem;
+    }
+
+    .report-page .brand {
+        gap: 0.45rem;
+        font-size: 0.9rem;
+    }
+
+    .report-page .brand-mark {
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+    }
+
+    .report-page .back-link {
+        padding: 0.4rem 0.5rem;
+        font-size: 0.72rem;
+    }
+
+    .report-page .report-main {
+        width: min(100% - 1rem, 620px);
+        padding-block: 1.8rem 2.5rem;
+    }
+
+    .report-page .report-form {
+        padding: 1rem;
+    }
+
+    .report-page .form-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .report-page .form-actions .button {
+        min-width: 0;
+        padding-inline: 0.4rem;
+        font-size: 0.78rem;
+        white-space: normal;
     }
 }
